@@ -231,6 +231,9 @@ export function createThemedStyles(colors: ThemeColors) {
       gap: 12,
       marginBottom: 28,
     },
+    appListSeparator: {
+      height: 12,
+    },
     appRow: {
       alignItems: 'center',
       backgroundColor: colors.surface,

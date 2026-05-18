@@ -1,0 +1,23 @@
+getting access to apps that user wants to track usage time for
+voice recordings  
+quotes page?
+no user accounts
+multi lingual support?
+dark light mode
+asking for user reviews
+    in review ask user what is the most successfull sentence you use to stay away from social media apps
+git install and push to github
+
+
+LATER ON:
+* ads setup? I think leave for initial stages
+
+Working on:
+* tell im able to open apk in android emulator. Now what to test
+* after that ask it to provide any possible next step
+
+
+DONE:
+* also ask how to test on desktop? probably using android studio
+    open andriod studio > Toos > device manager >   select "resizeable..." > it will open emulator
+        find icon next to chrome browser for your apk to test
