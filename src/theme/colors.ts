@@ -1,0 +1,41 @@
+import type {ThemeColors} from '../types';
+
+export const LIGHT_COLORS: ThemeColors = {
+  background: '#F8FAFC',
+  surface: '#FFFFFF',
+  surfaceAlt: '#EFF6FF',
+  text: '#0F172A',
+  mutedText: '#475569',
+  subtleText: '#64748B',
+  border: '#E2E8F0',
+  primary: '#2563EB',
+  primaryText: '#FFFFFF',
+  success: '#22C55E',
+  noticeBackground: '#EFF6FF',
+  noticeBorder: '#BFDBFE',
+  noticeTitle: '#1E3A8A',
+  noticeText: '#1E40AF',
+  metricBackground: '#0F172A',
+  metricText: '#FFFFFF',
+  metricLabel: '#CBD5E1',
+};
+
+export const DARK_COLORS: ThemeColors = {
+  background: '#090E1A',
+  surface: '#111827',
+  surfaceAlt: '#172033',
+  text: '#F8FAFC',
+  mutedText: '#CBD5E1',
+  subtleText: '#94A3B8',
+  border: '#263244',
+  primary: '#60A5FA',
+  primaryText: '#06111F',
+  success: '#4ADE80',
+  noticeBackground: '#102033',
+  noticeBorder: '#1D4ED8',
+  noticeTitle: '#BFDBFE',
+  noticeText: '#DBEAFE',
+  metricBackground: '#E0F2FE',
+  metricText: '#082F49',
+  metricLabel: '#0C4A6E',
+};
