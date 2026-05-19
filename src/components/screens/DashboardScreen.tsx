@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {Pressable, Text, View, Image} from 'react-native';
+import {Pressable, Text, View} from 'react-native';
 import {ScreenScaffold} from '../common/ScreenScaffold';
 import {useAppTheme} from '../../theme/ThemeContext';
 import {useSettings} from '../../contexts/SettingsContext';
@@ -173,16 +173,9 @@ export function DashboardScreen({
                     styles.appIconSmall,
                     {backgroundColor: item.app?.accent ?? '#64748B'},
                   ]}>
-                  {item.app?.icon ? (
-                    <Image
-                      source={{uri: `data:image/png;base64,${item.app.icon}`}}
-                      style={{width: '100%', height: '100%', borderRadius: 8}}
-                    />
-                  ) : (
-                    <Text style={styles.appIconTextSmall}>
-                      {(item.app?.name ?? '?').charAt(0)}
-                    </Text>
-                  )}
+                  <Text style={styles.appIconTextSmall}>
+                    {(item.app?.name ?? '?').charAt(0)}
+                  </Text>
                 </View>
                 <View style={styles.usageTextGroup}>
                   <Text style={styles.usageName}>

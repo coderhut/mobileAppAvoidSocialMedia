@@ -12,6 +12,7 @@
   "dependencies": {
     "react": "19.2.3",
     "react-native": "0.85.3",
+    "react-native-audio-recorder-player": "^3.6.10",
     "react-native-fs": "^2.20.0"
   },
   "devDependencies": {

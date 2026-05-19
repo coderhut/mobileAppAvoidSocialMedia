@@ -1,11 +1,4 @@
-export type Step =
-  | 'onboarding'
-  | 'battery'
-  | 'overlay'
-  | 'permission'
-  | 'apps'
-  | 'recordings'
-  | 'dashboard';
+export type Step = 'onboarding' | 'overlay' | 'permission' | 'apps' | 'recordings' | 'dashboard';
 export type ThemeMode = 'light' | 'dark';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type LanguageCode = 'en' | 'ur';
@@ -92,9 +85,7 @@ export type TranslationKey =
   | 'required'
   | 'optional'
   | 'minRecordingsAlert'
-  | 'finishSetup'
-  | 'suggestedApps'
-  | 'otherApps';
+  | 'finishSetup';
 
 export type TrackableApp = {
   name: string;
@@ -102,7 +93,6 @@ export type TrackableApp = {
   category: string;
   accent: string;
   isSystemApp?: boolean;
-  icon?: string | null;
 };
 
 export type UsageStat = {
@@ -123,7 +113,6 @@ export type InstalledApp = {
   packageName: string;
   appName: string;
   isSystemApp: boolean;
-  icon?: string | null;
 };
 
 export type UsageStatsBridge = {
@@ -134,15 +123,6 @@ export type UsageStatsBridge = {
   requestOverlayPermission: () => Promise<void>;
   startWatchdogService: () => Promise<void>;
   stopWatchdogService: () => Promise<void>;
-  isIgnoringBatteryOptimizations: () => Promise<boolean>;
-  requestIgnoreBatteryOptimizations: () => Promise<void>;
-};
-
-export type AudioBridge = {
-  startRecording: (path: String) => Promise<string>;
-  stopRecording: () => Promise<void>;
-  startPlayer: (path: string) => Promise<void>;
-  stopPlayer: () => Promise<void>;
 };
 
 export type AppPreferences = {

@@ -91,6 +91,14 @@ export function SettingsPanel({
     </Modal>
   );
 }
+            <Text style={styles.noticeTitle}>{t('privacyNoteTitle')}</Text>
+            <Text style={styles.noticeText}>{t('privacyNoteBody')}</Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 function SettingsOption({
   isSelected,

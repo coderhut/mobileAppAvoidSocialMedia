@@ -7,7 +7,6 @@ import android.app.Service
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -111,7 +110,6 @@ class WatchdogService : Service() {
 
         // 1. Detect if user is in a monitored app
         val activePackage = getActiveForegroundPackage()
-        currentForegroundPackage = activePackage
         val wasInMonitoredApp = isUserInMonitoredApp
         isUserInMonitoredApp = selectedPackages.contains(activePackage)
 
@@ -185,14 +183,13 @@ class WatchdogService : Service() {
             val randomIndex = Random.nextInt(notesArray.length())
             val filePath = notesArray.getString(randomIndex)
 
-            val appName = getAppName(packageManager, currentForegroundPackage ?: "")
             Log.d("Watchdog", "Playing Level $level note: $filePath")
             
             // Stop any existing sound/overlay before showing new one
             voiceNotePlayer.stop()
             interventionOverlay.hide()
 
-            interventionOverlay.show(level, appName) {
+            interventionOverlay.show(level) {
                 voiceNotePlayer.stop()
             }
             voiceNotePlayer.play(filePath) {
@@ -209,15 +206,6 @@ class WatchdogService : Service() {
         val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 1000 * 60, time)
         
         return stats?.maxByOrNull { it.lastTimeUsed }?.packageName
-    }
-
-    private fun getAppName(packageManager: PackageManager, packageName: String): String {
-        return try {
-            val appInfo = packageManager.getApplicationInfo(packageName, 0)
-            packageManager.getApplicationLabel(appInfo).toString()
-        } catch (e: Exception) {
-            packageName
-        }
     }
 
     private fun calculateTotalUsage(packageNames: Set<String>): Long {

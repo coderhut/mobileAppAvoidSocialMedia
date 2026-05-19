@@ -2,17 +2,22 @@ import React, {useState, useRef, useEffect, useCallback} from 'react';
 import {
   ActivityIndicator,
   Alert,
-  PermissionsAndroid,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import AudioRecorderPlayer, {
+  AudioEncoderAndroidType,
+  AudioSourceAndroidType,
+  AVEncoderAudioQualityIOSType,
+  AVEncodingOption,
+} from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
 import {useAppTheme} from '../../theme/ThemeContext';
 import {useSettings} from '../../contexts/SettingsContext';
-import {AudioModule} from '../../native/modules';
 import {PrimaryButton} from '../common/PrimaryButton';
 import {ScreenScaffold} from '../common/ScreenScaffold';
 
@@ -31,109 +36,75 @@ export function VoiceRecordingScreen({
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState('00:00');
   const [activeSlot, setActiveSlot] = useState<{level: number; index: number} | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number>(0);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      AudioModule?.stopPlayer().catch(() => undefined);
-      AudioModule?.stopRecording().catch(() => undefined);
-    };
-  }, []);
-
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
+  const audioRecorderPlayer = useRef(new AudioRecorderPlayer()).current;
 
   const onStartRecord = async (level: number, index: number) => {
     if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          {
-            title: 'Microphone Permission',
-            message: 'App needs access to your microphone to record your voice notes.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          },
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission Denied', 'Microphone access is required to record voice notes.');
-          return;
-        }
-      } catch (err) {
-        console.warn(err);
-        return;
-      }
+      // Permission check should be handled at the app level or before this screen
     }
 
     setActiveSlot({level, index});
     setIsRecording(true);
-    setRecordTime('00:00');
-    startTimeRef.current = Date.now();
 
-    const path = `${RNFS.DocumentDirectoryPath}/voice_level${level}_${index}.mp4`;
+    const path = Platform.select({
+      android: `${RNFS.DocumentDirectoryPath}/voice_level${level}_${index}.mp4`,
+      ios: `voice_level${level}_${index}.m4a`,
+    });
+
+    const audioSet = {
+      AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+      AudioSourceAndroid: AudioSourceAndroidType.MIC,
+      AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
+      AVNumberOfChannelsKeyIOS: 2,
+      AVFormatIDKeyIOS: AVEncodingOption.aac,
+    };
 
     try {
-      // Ensure the directory exists (though DocumentDirectory usually does)
-      const folderPath = RNFS.DocumentDirectoryPath;
-      const exists = await RNFS.exists(folderPath);
-      if (!exists) {
-        await RNFS.mkdir(folderPath);
-      }
+      await audioRecorderPlayer.startRecorder(path, audioSet);
+      audioRecorderPlayer.addRecordBackListener((e) => {
+        setRecordTime(audioRecorderPlayer.mmssss(Math.floor(e.currentPosition)));
 
-      await AudioModule?.startRecording(path);
-
-      timerRef.current = setInterval(() => {
-        const elapsed = Date.now() - startTimeRef.current;
-        setRecordTime(formatTime(elapsed));
-
-        if (elapsed >= MAX_DURATION_SEC * 1000) {
+        if (e.currentPosition >= MAX_DURATION_SEC * 1000) {
           onStopRecord();
         }
-      }, 100);
+      });
     } catch (err) {
       console.error('Failed to start recorder', err);
       setIsRecording(false);
       setActiveSlot(null);
-      Alert.alert('Error', 'Failed to start recording. Please try again.');
     }
   };
 
   const onStopRecord = async () => {
     if (!isRecording) return;
 
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
     try {
-      await AudioModule?.stopRecording();
+      const result = await audioRecorderPlayer.stopRecorder();
+      audioRecorderPlayer.removeRecordBackListener();
       setIsRecording(false);
 
       const slot = activeSlot;
-      const path = `${RNFS.DocumentDirectoryPath}/voice_level${slot?.level}_${slot?.index}.mp4`;
       setActiveSlot(null);
       setRecordTime('00:00');
 
       if (slot) {
-        saveVoiceNote(slot.level, path);
+        // Simple logic: if result is too short, we could delete it, but for now just save it
+        saveVoiceNote(slot.level, result);
       }
     } catch (err) {
       console.error('Failed to stop recorder', err);
-      setIsRecording(false);
     }
   };
 
   const onPlayBack = async (path: string) => {
     try {
-      await AudioModule?.startPlayer(path);
+      await audioRecorderPlayer.startPlayer(path);
+      audioRecorderPlayer.addPlayBackListener((e) => {
+        if (e.currentPosition === e.duration) {
+          audioRecorderPlayer.stopPlayer();
+        }
+      });
     } catch (err) {
       console.error('Failed to play', err);
     }

@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
-import android.os.CountDownTimer
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -17,9 +16,8 @@ class InterventionOverlay(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var overlayView: View? = null
-    private var countDownTimer: CountDownTimer? = null
 
-    fun show(level: Int, appName: String, onDismiss: () -> Unit) {
+    fun show(level: Int, onDismiss: () -> Unit) {
         if (overlayView != null) return
 
         val layoutParams = WindowManager.LayoutParams().apply {
@@ -33,8 +31,7 @@ class InterventionOverlay(private val context: Context) {
             }
             flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or 
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                    WindowManager.LayoutParams.FLAG_FULLSCREEN
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             format = PixelFormat.TRANSLUCENT
             gravity = Gravity.CENTER
         }
@@ -54,10 +51,7 @@ class InterventionOverlay(private val context: Context) {
                 else -> "URGENT INTERVENTION"
             }
 
-            message.text = "Stop using $appName. You recorded this note to help you stay focused. Listen carefully."
-
             btnClose.setOnClickListener {
-                stopTimer()
                 onDismiss()
                 val startMain = Intent(Intent.ACTION_MAIN)
                 startMain.addCategory(Intent.CATEGORY_HOME)
@@ -66,24 +60,7 @@ class InterventionOverlay(private val context: Context) {
                 hide()
             }
 
-            btnIgnore.isEnabled = false
-            btnIgnore.alpha = 0.5f
-            
-            countDownTimer = object : CountDownTimer(5000, 1000) {
-                override fun onTick(millisUntilFinished: Long) {
-                    val seconds = (millisUntilFinished / 1000) + 1
-                    btnIgnore.text = "Wait $seconds seconds..."
-                }
-
-                override fun onFinish() {
-                    btnIgnore.isEnabled = true
-                    btnIgnore.alpha = 1.0f
-                    btnIgnore.text = "Dismiss Overlay"
-                }
-            }.start()
-
             btnIgnore.setOnClickListener {
-                stopTimer()
                 onDismiss()
                 hide()
             }
@@ -92,13 +69,7 @@ class InterventionOverlay(private val context: Context) {
         }
     }
 
-    private fun stopTimer() {
-        countDownTimer?.cancel()
-        countDownTimer = null
-    }
-
     fun hide() {
-        stopTimer()
         overlayView?.let {
             windowManager.removeView(it)
             overlayView = null

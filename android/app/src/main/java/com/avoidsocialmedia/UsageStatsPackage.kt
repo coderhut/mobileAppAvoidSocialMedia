@@ -10,7 +10,6 @@ class UsageStatsPackage : ReactPackage {
     return listOf(
       AppPreferencesModule(reactContext),
       UsageStatsModule(reactContext),
-      AudioModule(reactContext)
     )
   }
 

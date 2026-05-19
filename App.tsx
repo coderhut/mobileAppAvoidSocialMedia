@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import {SettingsPanel} from './src/components/common/SettingsPanel';
 import {AppSelectionScreen} from './src/components/screens/AppSelectionScreen';
-import {BatteryOptimizationScreen} from './src/components/screens/BatteryOptimizationScreen';
 import {DashboardScreen} from './src/components/screens/DashboardScreen';
 import {IntroScreen} from './src/components/screens/IntroScreen';
 import {OverlayPermissionScreen} from './src/components/screens/OverlayPermissionScreen';
@@ -98,10 +97,8 @@ function AppContent() {
   const [isLoadingApps, setIsLoadingApps] = useState(false);
   const [hasUsageAccess, setHasUsageAccess] = useState(false);
   const [hasOverlayAccess, setHasOverlayAccess] = useState(false);
-  const [isIgnoringBatteryOptimizations, setIsIgnoringBatteryOptimizations] = useState(false);
   const [isCheckingAccess, setIsCheckingAccess] = useState(false);
   const [isCheckingOverlay, setIsCheckingOverlay] = useState(false);
-  const [isCheckingBattery, setIsCheckingBattery] = useState(false);
   const [usageStats, setUsageStats] = useState<UsageStat[]>([]);
   const [usageError, setUsageError] = useState<string | null>(null);
 
@@ -186,30 +183,6 @@ function AppContent() {
     await UsageStatsModule.requestOverlayPermission();
   }
 
-  const refreshBatteryAccess = React.useCallback(async () => {
-    if (Platform.OS !== 'android' || !UsageStatsModule) {
-      return false;
-    }
-
-    setIsCheckingBattery(true);
-    try {
-      const nextHasBatteryAccess = await UsageStatsModule.isIgnoringBatteryOptimizations();
-      setIsIgnoringBatteryOptimizations(nextHasBatteryAccess);
-      return nextHasBatteryAccess;
-    } catch {
-      return false;
-    } finally {
-      setIsCheckingBattery(false);
-    }
-  }, []);
-
-  async function openBatterySettings() {
-    if (Platform.OS !== 'android' || !UsageStatsModule) {
-      return;
-    }
-    await UsageStatsModule.requestIgnoreBatteryOptimizations();
-  }
-
   const refreshUsageStats = React.useCallback(async () => {
     if (Platform.OS !== 'android' || !UsageStatsModule) {
       setUsageError(t('usageStatsAndroidOnly'));
@@ -255,32 +228,24 @@ function AppContent() {
   React.useEffect(() => {
     refreshUsageAccess();
     refreshOverlayAccess();
-    refreshBatteryAccess();
     loadInstalledApps();
 
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
         refreshUsageAccess();
         refreshOverlayAccess();
-        refreshBatteryAccess();
         loadInstalledApps();
       }
     });
 
     return () => subscription.remove();
-  }, [loadInstalledApps, refreshUsageAccess, refreshOverlayAccess, refreshBatteryAccess]);
+  }, [loadInstalledApps, refreshUsageAccess, refreshOverlayAccess]);
 
   React.useEffect(() => {
     if (hasUsageAccess) {
       refreshUsageStats();
     }
   }, [hasUsageAccess, refreshUsageStats]);
-
-  React.useEffect(() => {
-    if (step === 'battery' && isIgnoringBatteryOptimizations) {
-      setStep('overlay');
-    }
-  }, [isIgnoringBatteryOptimizations, step]);
 
   React.useEffect(() => {
     if (step === 'overlay' && hasOverlayAccess) {
@@ -298,20 +263,9 @@ function AppContent() {
     if (step === 'onboarding') {
       return (
         <IntroScreen
-          onContinue={() => setStep('battery')}
+          onContinue={() => setStep('overlay')}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onSkipToDashboard={() => setStep('dashboard')}
-        />
-      );
-    }
-
-    if (step === 'battery') {
-      return (
-        <BatteryOptimizationScreen
-          isIgnoringBatteryOptimizations={isIgnoringBatteryOptimizations}
-          isCheckingAccess={isCheckingBattery}
-          onOpenSettings={openBatterySettings}
-          onOpenSettingsMenu={() => setIsSettingsOpen(true)}
         />
       );
     }

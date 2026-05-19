@@ -32,11 +32,6 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
       'This allows the app to show the "STOP" overlay when you reach your limit. Without this, we can only play audio.',
     openOverlaySettings: 'Open Overlay Settings',
     overlayAccessDetected: 'Overlay access detected. Moving to next step...',
-    batteryOptimizationTitle: 'Disable Battery Optimization',
-    batteryOptimizationBody:
-      'To ensure the app can monitor usage in the background without being killed by the system, please disable battery optimization for this app.',
-    openBatterySettings: 'Open Battery Settings',
-    batteryAccessDetected: 'Battery optimization disabled. Moving to next step...',
     whatThisEnables: 'What this enables',
     whatThisEnablesBody:
       'Daily app usage summaries, selected-app tracking, and future reminders or limits.',
@@ -98,8 +93,6 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     optional: 'Optional',
     minRecordingsAlert: 'Please record at least one note for each level to proceed.',
     finishSetup: 'Finish setup',
-    suggestedApps: 'Suggested Apps',
-    otherApps: 'Other Apps',
   },
   ur: {
     appName: 'سوشل میڈیا سے بچیں',
@@ -133,11 +126,6 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
       'یہ ایپ کو آپ کی حد تک پہنچنے پر "STOP" اوورلے دکھانے کی اجازت دیتا ہے۔ اس کے بغیر، ہم صرف آڈیو چلا سکتے ہیں۔',
     openOverlaySettings: 'اوورلے سیٹنگز کھولیں',
     overlayAccessDetected: 'اوورلے رسائی مل گئی۔ اگلے مرحلے پر جا رہے ہیں...',
-    batteryOptimizationTitle: 'بیٹری آپٹیمائزیشن کو غیر فعال کریں',
-    batteryOptimizationBody:
-      'اس بات کو یقینی بنانے کے لیے کہ ایپ سسٹم کے ذریعے ختم کیے بغیر پس منظر میں استعمال کی نگرانی کر سکے، براہ کرم اس ایپ کے لیے بیٹری آپٹیمائزیشن کو غیر فعال کر دیں۔',
-    openBatterySettings: 'بیٹری کی ترتیبات کھولیں',
-    batteryAccessDetected: 'بیٹری کی اصلاح غیر فعال ہے۔ اگلے مرحلے پر جا رہے ہیں...',
     whatThisEnables: 'یہ کیا ممکن بناتا ہے',
     whatThisEnablesBody:
       'روزانہ app usage summary، منتخب ایپس کی tracking، اور بعد میں reminders یا limits۔',
@@ -199,7 +187,5 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     optional: 'اختیاری',
     minRecordingsAlert: 'براہ کرم آگے بڑھنے کے لیے ہر لیول کے لیے کم از کم ایک آواز ریکارڈ کریں۔',
     finishSetup: 'سیٹ اپ مکمل کریں',
-    suggestedApps: 'تجویز کردہ ایپس',
-    otherApps: 'دیگر ایپس',
   },
 };
