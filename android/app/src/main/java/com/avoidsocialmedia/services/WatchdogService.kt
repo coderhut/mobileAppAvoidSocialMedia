@@ -12,7 +12,9 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import com.avoidsocialmedia.BuildConfig
 import com.avoidsocialmedia.R
 import org.json.JSONArray
 import org.json.JSONObject
@@ -138,6 +140,33 @@ class WatchdogService : Service() {
             hasHitDailyLimitInitially = false
             updateNotification("Usage: $totalUsageMinutes/$globalLimitMinutes min")
         }
+
+        // Test Toast - Only in Debug builds
+        if (BuildConfig.DEBUG) {
+            val nextVNMin = getNextVNInMinutes(totalUsageMinutes, globalLimitMinutes)
+            if (nextVNMin > 0 && isUserInMonitoredApp) {
+                Toast.makeText(this, "Next VN in $nextVNMin minutes", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun getNextVNInMinutes(currentMin: Int, limitMin: Int): Int {
+        return if (!hasHitDailyLimitInitially) {
+            when (currentEscalationLevel) {
+                0 -> limitMin - currentMin
+                1 -> (limitMin + 5) - currentMin
+                2 -> (limitMin + 8) - currentMin
+                else -> 0
+            }
+        } else {
+            val sessionElapsedMin = ((System.currentTimeMillis() - sessionStartTimeMs) / 60000).toInt()
+            when (currentEscalationLevel) {
+                0 -> 10 - sessionElapsedMin
+                1 -> 15 - sessionElapsedMin
+                2 -> 18 - sessionElapsedMin
+                else -> 0
+            }
+        }.coerceAtLeast(0)
     }
 
     private fun handleEscalation(currentMin: Int, limitMin: Int, voiceNotesJson: String) {
@@ -176,12 +205,26 @@ class WatchdogService : Service() {
     private fun triggerVoiceNote(level: Int, voiceNotesJson: String) {
         try {
             val json = JSONObject(voiceNotesJson)
-            val notesArray = json.optJSONArray(level.toString()) ?: return
-            if (notesArray.length() == 0) return
+            val levelData = json.opt(level.toString()) ?: return
+            
+            val availablePaths = mutableListOf<String>()
+            
+            if (levelData is JSONArray) {
+                for (i in 0 until levelData.length()) {
+                    availablePaths.add(levelData.getString(i))
+                }
+            } else if (levelData is JSONObject) {
+                val keys = levelData.keys()
+                while (keys.hasNext()) {
+                    availablePaths.add(levelData.getString(keys.next()))
+                }
+            }
+
+            if (availablePaths.isEmpty()) return
 
             // Pick a random note from the level
-            val randomIndex = Random.nextInt(notesArray.length())
-            val filePath = notesArray.getString(randomIndex)
+            val randomIndex = Random.nextInt(availablePaths.size)
+            val filePath = availablePaths[randomIndex]
 
             Log.d("Watchdog", "Playing Level $level note: $filePath")
             
@@ -189,7 +232,7 @@ class WatchdogService : Service() {
             voiceNotePlayer.stop()
             interventionOverlay.hide()
 
-            interventionOverlay.show(level) {
+            interventionOverlay.show(level, currentForegroundPackage) {
                 voiceNotePlayer.stop()
             }
             voiceNotePlayer.play(filePath) {

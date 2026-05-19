@@ -89,6 +89,20 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
+  fun hasNotificationPermission(promise: Promise) {
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val status = reactContext.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+        promise.resolve(status == PackageManager.PERMISSION_GRANTED)
+      } else {
+        promise.resolve(true)
+      }
+    } catch (error: Exception) {
+      promise.reject("NOTIFICATION_PERMISSION_CHECK_FAILED", error)
+    }
+  }
+
+  @ReactMethod
   fun requestOverlayPermission(promise: Promise) {
     try {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

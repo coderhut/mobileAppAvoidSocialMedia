@@ -36,6 +36,7 @@ export function VoiceRecordingScreen({
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState('00:00');
   const [activeSlot, setActiveSlot] = useState<{level: number; index: number} | null>(null);
+  const isRecordingRef = useRef(false);
 
   const audioRecorderPlayer = useRef(new AudioRecorderPlayer()).current;
 
@@ -46,6 +47,7 @@ export function VoiceRecordingScreen({
 
     setActiveSlot({level, index});
     setIsRecording(true);
+    isRecordingRef.current = true;
 
     const path = Platform.select({
       android: `${RNFS.DocumentDirectoryPath}/voice_level${level}_${index}.mp4`,
@@ -72,25 +74,26 @@ export function VoiceRecordingScreen({
     } catch (err) {
       console.error('Failed to start recorder', err);
       setIsRecording(false);
+      isRecordingRef.current = false;
       setActiveSlot(null);
     }
   };
 
   const onStopRecord = async () => {
-    if (!isRecording) return;
+    if (!isRecordingRef.current) return;
 
     try {
       const result = await audioRecorderPlayer.stopRecorder();
       audioRecorderPlayer.removeRecordBackListener();
       setIsRecording(false);
+      isRecordingRef.current = false;
 
       const slot = activeSlot;
       setActiveSlot(null);
       setRecordTime('00:00');
 
       if (slot) {
-        // Simple logic: if result is too short, we could delete it, but for now just save it
-        saveVoiceNote(slot.level, result);
+        saveVoiceNote(slot.level, slot.index, result);
       }
     } catch (err) {
       console.error('Failed to stop recorder', err);
@@ -111,7 +114,8 @@ export function VoiceRecordingScreen({
   };
 
   const isLevelComplete = (level: number) => {
-    return (voiceNotes[level] || []).length > 0;
+    const notes = voiceNotes[level] || {};
+    return Object.keys(notes).length > 0;
   };
 
   const canContinue = isLevelComplete(1) && isLevelComplete(2) && isLevelComplete(3);
@@ -125,8 +129,9 @@ export function VoiceRecordingScreen({
   };
 
   const renderSlot = (level: number, index: number) => {
-    const notes = voiceNotes[level] || [];
-    const isRecorded = notes.length > index;
+    const notes = voiceNotes[level] || {};
+    const path = notes[index];
+    const isRecorded = !!path;
     const isActive = activeSlot?.level === level && activeSlot?.index === index;
     const isRequired = index === 0;
 
@@ -137,7 +142,7 @@ export function VoiceRecordingScreen({
             {isRequired ? t('required') : t('optional')} {index + 1}
           </Text>
           {isRecorded && (
-            <Pressable onPress={() => onPlayBack(notes[index])}>
+            <Pressable onPress={() => onPlayBack(path)}>
               <Text style={[styles.linkText, {fontSize: 14}]}>▶ Play</Text>
             </Pressable>
           )}

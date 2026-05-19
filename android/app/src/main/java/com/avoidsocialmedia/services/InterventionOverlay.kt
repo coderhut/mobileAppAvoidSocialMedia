@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
+import android.content.pm.PackageManager
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -17,8 +18,20 @@ class InterventionOverlay(private val context: Context) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var overlayView: View? = null
 
-    fun show(level: Int, onDismiss: () -> Unit) {
+    fun show(level: Int, packageName: String?, onDismiss: () -> Unit) {
         if (overlayView != null) return
+
+        val appName = if (packageName != null) {
+            try {
+                val pm = context.packageManager
+                val info = pm.getApplicationInfo(packageName, 0)
+                pm.getApplicationLabel(info).toString()
+            } catch (e: Exception) {
+                "App"
+            }
+        } else {
+            "App"
+        }
 
         val layoutParams = WindowManager.LayoutParams().apply {
             width = WindowManager.LayoutParams.MATCH_PARENT
@@ -50,6 +63,8 @@ class InterventionOverlay(private val context: Context) {
                 2 -> "FIRM WARNING"
                 else -> "URGENT INTERVENTION"
             }
+
+            btnClose.text = "STOP USING $appName".uppercase()
 
             btnClose.setOnClickListener {
                 onDismiss()

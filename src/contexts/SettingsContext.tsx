@@ -1,4 +1,5 @@
 import React, {createContext, useContext, useEffect, useState, useCallback} from 'react';
+import RNFS from 'react-native-fs';
 import {AppPreferencesModule} from '../native/modules';
 import type {DailyLimitSetting, DailyLimitSettings} from '../types';
 import {normalizeDailyLimitSetting, parseDailyLimitSettings} from '../utils/dailyLimits';
@@ -13,8 +14,8 @@ type SettingsContextType = {
   setThemePreference: (preference: ThemePreference) => void;
   language: LanguageCode;
   setLanguage: (language: LanguageCode) => void;
-  voiceNotes: Record<number, string[]>;
-  saveVoiceNote: (level: number, filePath: string) => void;
+  voiceNotes: Record<number, Record<number, string>>;
+  saveVoiceNote: (level: number, index: number, filePath: string) => void;
   deleteVoiceNote: (level: number, index: number) => void;
   globalDailyLimit: number;
   setGlobalDailyLimit: (limit: number) => void;
@@ -30,10 +31,10 @@ export function SettingsProvider({children}: {children: React.ReactNode}) {
   const [dailyLimitSettings, setDailyLimitSettings] = useState<DailyLimitSettings>({});
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>('system');
   const [language, setLanguageState] = useState<LanguageCode>('en');
-  const [voiceNotes, setVoiceNotesState] = useState<Record<number, string[]>>({
-    1: [],
-    2: [],
-    3: [],
+  const [voiceNotes, setVoiceNotesState] = useState<Record<number, Record<number, string>>>({
+    1: {},
+    2: {},
+    3: {},
   });
   const [globalDailyLimit, setGlobalDailyLimitState] = useState<number>(30); // Default 30 mins
 
@@ -110,22 +111,10 @@ export function SettingsProvider({children}: {children: React.ReactNode}) {
     AppPreferencesModule?.setLanguage(nextLanguage).catch(() => undefined);
   }, []);
 
-  const saveVoiceNote = useCallback((level: number, filePath: string) => {
+  const saveVoiceNote = useCallback((level: number, index: number, filePath: string) => {
     setVoiceNotesState(current => {
-      const levelNotes = current[level] || [];
-      const nextNotes = {
-        ...current,
-        [level]: [...levelNotes, filePath],
-      };
-      AppPreferencesModule?.setVoiceNotes(JSON.stringify(nextNotes)).catch(() => undefined);
-      return nextNotes;
-    });
-  }, []);
-
-  const deleteVoiceNote = useCallback((level: number, index: number) => {
-    setVoiceNotesState(current => {
-      const levelNotes = [...(current[level] || [])];
-      levelNotes.splice(index, 1);
+      const levelNotes = {...(current[level] || {})};
+      levelNotes[index] = filePath;
       const nextNotes = {
         ...current,
         [level]: levelNotes,
@@ -133,6 +122,35 @@ export function SettingsProvider({children}: {children: React.ReactNode}) {
       AppPreferencesModule?.setVoiceNotes(JSON.stringify(nextNotes)).catch(() => undefined);
       return nextNotes;
     });
+  }, []);
+
+  const deleteVoiceNote = useCallback(async (level: number, index: number) => {
+    let filePathToDelete: string | null = null;
+
+    setVoiceNotesState(current => {
+      const levelNotes = {...(current[level] || {})};
+      filePathToDelete = levelNotes[index];
+      delete levelNotes[index];
+
+      const nextNotes = {
+        ...current,
+        [level]: levelNotes,
+      };
+      AppPreferencesModule?.setVoiceNotes(JSON.stringify(nextNotes)).catch(() => undefined);
+      return nextNotes;
+    });
+
+    if (filePathToDelete) {
+      try {
+        const exists = await RNFS.exists(filePathToDelete);
+        if (exists) {
+          await RNFS.unlink(filePathToDelete);
+          console.log('Deleted file:', filePathToDelete);
+        }
+      } catch (e) {
+        console.error('Failed to delete voice note file', e);
+      }
+    }
   }, []);
 
   const setGlobalDailyLimit = useCallback((limit: number) => {

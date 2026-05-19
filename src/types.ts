@@ -1,4 +1,4 @@
-export type Step = 'onboarding' | 'overlay' | 'permission' | 'apps' | 'recordings' | 'dashboard';
+export type Step = 'onboarding' | 'setup_permissions' | 'apps' | 'recordings' | 'dashboard';
 export type ThemeMode = 'light' | 'dark';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type LanguageCode = 'en' | 'ur';
@@ -85,7 +85,19 @@ export type TranslationKey =
   | 'required'
   | 'optional'
   | 'minRecordingsAlert'
-  | 'finishSetup';
+  | 'finishSetup'
+  | 'setupPermissionsTitle'
+  | 'setupPermissionsBody'
+  | 'usageAccessLabel'
+  | 'usageAccessDesc'
+  | 'overlayLabel'
+  | 'overlayDesc'
+  | 'microphoneLabel'
+  | 'microphoneDesc'
+  | 'notificationLabel'
+  | 'notificationDesc'
+  | 'grantLabel'
+  | 'allSetLabel';
 
 export type TrackableApp = {
   name: string;

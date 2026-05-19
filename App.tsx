@@ -12,8 +12,7 @@ import {SettingsPanel} from './src/components/common/SettingsPanel';
 import {AppSelectionScreen} from './src/components/screens/AppSelectionScreen';
 import {DashboardScreen} from './src/components/screens/DashboardScreen';
 import {IntroScreen} from './src/components/screens/IntroScreen';
-import {OverlayPermissionScreen} from './src/components/screens/OverlayPermissionScreen';
-import {PermissionScreen} from './src/components/screens/PermissionScreen';
+import {SetupPermissionsScreen} from './src/components/screens/SetupPermissionsScreen';
 import {VoiceRecordingScreen} from './src/components/screens/VoiceRecordingScreen';
 import {TRANSLATIONS} from './src/locales';
 import {UsageStatsModule} from './src/native/modules';
@@ -21,6 +20,7 @@ import {AppThemeContext, useAppTheme} from './src/theme/ThemeContext';
 import {DARK_COLORS, LIGHT_COLORS} from './src/theme/colors';
 import {createThemedStyles} from './src/theme/styles';
 import {SettingsProvider, useSettings} from './src/contexts/SettingsContext';
+import {PermissionsAndroid} from 'react-native';
 import type {
   LanguageCode,
   Step,
@@ -97,8 +97,9 @@ function AppContent() {
   const [isLoadingApps, setIsLoadingApps] = useState(false);
   const [hasUsageAccess, setHasUsageAccess] = useState(false);
   const [hasOverlayAccess, setHasOverlayAccess] = useState(false);
+  const [hasNotificationAccess, setHasNotificationAccess] = useState(false);
+  const [hasMicrophoneAccess, setHasMicrophoneAccess] = useState(false);
   const [isCheckingAccess, setIsCheckingAccess] = useState(false);
-  const [isCheckingOverlay, setIsCheckingOverlay] = useState(false);
   const [usageStats, setUsageStats] = useState<UsageStat[]>([]);
   const [usageError, setUsageError] = useState<string | null>(null);
 
@@ -164,17 +165,58 @@ function AppContent() {
       return false;
     }
 
-    setIsCheckingOverlay(true);
     try {
       const nextHasOverlayAccess = await UsageStatsModule.hasOverlayPermission();
       setHasOverlayAccess(nextHasOverlayAccess);
       return nextHasOverlayAccess;
     } catch {
       return false;
-    } finally {
-      setIsCheckingOverlay(false);
     }
   }, []);
+
+  const refreshNotificationAccess = React.useCallback(async () => {
+    if (Platform.OS !== 'android' || !UsageStatsModule) return false;
+    try {
+      const granted = await UsageStatsModule.hasNotificationPermission();
+      setHasNotificationAccess(granted);
+      return granted;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const refreshMicrophoneAccess = React.useCallback(async () => {
+    if (Platform.OS !== 'android') return false;
+    try {
+      const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+      setHasMicrophoneAccess(granted);
+      return granted;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const requestMicrophoneAccess = async () => {
+    if (Platform.OS !== 'android') return;
+    try {
+      await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+      refreshMicrophoneAccess();
+    } catch (err) {
+      console.warn(err);
+    }
+  };
+
+  const requestNotificationAccess = async () => {
+    if (Platform.OS !== 'android') return;
+    try {
+      if (Platform.Version >= 33) {
+        await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS' as any);
+      }
+      refreshNotificationAccess();
+    } catch (err) {
+      console.warn(err);
+    }
+  };
 
   async function openOverlaySettings() {
     if (Platform.OS !== 'android' || !UsageStatsModule) {
@@ -228,18 +270,22 @@ function AppContent() {
   React.useEffect(() => {
     refreshUsageAccess();
     refreshOverlayAccess();
+    refreshNotificationAccess();
+    refreshMicrophoneAccess();
     loadInstalledApps();
 
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
         refreshUsageAccess();
         refreshOverlayAccess();
+        refreshNotificationAccess();
+        refreshMicrophoneAccess();
         loadInstalledApps();
       }
     });
 
     return () => subscription.remove();
-  }, [loadInstalledApps, refreshUsageAccess, refreshOverlayAccess]);
+  }, [loadInstalledApps, refreshUsageAccess, refreshOverlayAccess, refreshNotificationAccess, refreshMicrophoneAccess]);
 
   React.useEffect(() => {
     if (hasUsageAccess) {
@@ -247,47 +293,30 @@ function AppContent() {
     }
   }, [hasUsageAccess, refreshUsageStats]);
 
-  React.useEffect(() => {
-    if (step === 'overlay' && hasOverlayAccess) {
-      setStep('permission');
-    }
-  }, [hasOverlayAccess, step]);
-
-  React.useEffect(() => {
-    if (step === 'permission' && hasUsageAccess) {
-      setStep('apps');
-    }
-  }, [hasUsageAccess, step]);
-
   function renderContent() {
     if (step === 'onboarding') {
       return (
         <IntroScreen
-          onContinue={() => setStep('overlay')}
+          onContinue={() => setStep('setup_permissions')}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onSkipToDashboard={() => setStep('dashboard')}
         />
       );
     }
 
-    if (step === 'overlay') {
+    if (step === 'setup_permissions') {
       return (
-        <OverlayPermissionScreen
-          hasOverlayAccess={hasOverlayAccess}
-          isCheckingAccess={isCheckingOverlay}
-          onOpenSettings={openOverlaySettings}
-          onOpenSettingsMenu={() => setIsSettingsOpen(true)}
-        />
-      );
-    }
-
-    if (step === 'permission') {
-      return (
-        <PermissionScreen
+        <SetupPermissionsScreen
           hasUsageAccess={hasUsageAccess}
-          isCheckingAccess={isCheckingAccess}
+          hasOverlayAccess={hasOverlayAccess}
+          hasNotificationAccess={hasNotificationAccess}
+          hasMicrophoneAccess={hasMicrophoneAccess}
+          onOpenUsageSettings={openUsageAccessSettings}
+          onOpenOverlaySettings={openOverlaySettings}
+          requestMicrophone={requestMicrophoneAccess}
+          requestNotifications={requestNotificationAccess}
+          onContinue={() => setStep('apps')}
           onOpenSettingsMenu={() => setIsSettingsOpen(true)}
-          onOpenSettings={openUsageAccessSettings}
         />
       );
     }
