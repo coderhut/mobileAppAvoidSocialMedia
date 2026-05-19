@@ -99,18 +99,52 @@ export function AppSelectionScreen({
   );
 
   return (
-    <SectionList
-      contentContainerStyle={styles.scrollContent}
-      sections={sections}
-      initialNumToRender={20}
-      ItemSeparatorComponent={AppListSeparator}
-      keyExtractor={app => app.packageName}
-      renderSectionHeader={({section: {title}}) => (
-        <View style={{backgroundColor: colors.background, paddingVertical: 12}}>
-          <Text style={[styles.sectionTitle, {color: colors.primary}]}>{title}</Text>
-        </View>
-      )}
-      ListFooterComponent={
+    <View style={{flex: 1}}>
+      <SectionList
+        contentContainerStyle={[styles.scrollContent, {paddingBottom: 100}]}
+        sections={sections}
+        initialNumToRender={20}
+        ItemSeparatorComponent={AppListSeparator}
+        keyExtractor={app => app.packageName}
+        renderSectionHeader={({section: {title}}) => (
+          <View style={{backgroundColor: colors.background, paddingVertical: 12}}>
+            <Text style={[styles.sectionTitle, {color: colors.primary}]}>{title}</Text>
+          </View>
+        )}
+        ListHeaderComponent={
+          <>
+            <View style={styles.topBar}>
+              <Text style={styles.eyebrow}>{t('stepTwo')}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onOpenSettings}
+                style={styles.themeToggle}>
+                <Text style={styles.themeToggleText}>{t('settings')}</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.title}>{t('appSelectionTitle')}</Text>
+            <Text style={styles.body}>{t('appSelectionBody')}</Text>
+            {isLoadingApps ? (
+              <Text style={styles.helperText}>Loading installed apps...</Text>
+            ) : null}
+          </>
+        }
+        stickySectionHeadersEnabled={true}
+        renderItem={renderAppRow}
+        showsVerticalScrollIndicator={false}
+        windowSize={9}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: 24,
+          backgroundColor: colors.background,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        }}>
         <PrimaryButton
           disabled={selectedPackageNames.length === 0}
           label={`${t('continueWith')} ${selectedPackageNames.length} ${
@@ -118,30 +152,8 @@ export function AppSelectionScreen({
           }`}
           onPress={onContinue}
         />
-      }
-      ListHeaderComponent={
-        <>
-          <View style={styles.topBar}>
-            <Text style={styles.eyebrow}>{t('stepTwo')}</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onOpenSettings}
-              style={styles.themeToggle}>
-              <Text style={styles.themeToggleText}>{t('settings')}</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.title}>{t('appSelectionTitle')}</Text>
-          <Text style={styles.body}>{t('appSelectionBody')}</Text>
-          {isLoadingApps ? (
-            <Text style={styles.helperText}>Loading installed apps...</Text>
-          ) : null}
-        </>
-      }
-      stickySectionHeadersEnabled={true}
-      renderItem={renderAppRow}
-      showsVerticalScrollIndicator={false}
-      windowSize={9}
-    />
+      </View>
+    </View>
   );
 }
 

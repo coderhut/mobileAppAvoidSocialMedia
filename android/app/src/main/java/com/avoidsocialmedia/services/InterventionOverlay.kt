@@ -19,7 +19,7 @@ class InterventionOverlay(private val context: Context) {
     private var overlayView: View? = null
     private var countDownTimer: CountDownTimer? = null
 
-    fun show(level: Int, onDismiss: () -> Unit) {
+    fun show(level: Int, appName: String, onDismiss: () -> Unit) {
         if (overlayView != null) return
 
         val layoutParams = WindowManager.LayoutParams().apply {
@@ -53,6 +53,8 @@ class InterventionOverlay(private val context: Context) {
                 2 -> "FIRM WARNING"
                 else -> "URGENT INTERVENTION"
             }
+
+            message.text = "Stop using $appName. You recorded this note to help you stay focused. Listen carefully."
 
             btnClose.setOnClickListener {
                 stopTimer()
