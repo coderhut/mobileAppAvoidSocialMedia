@@ -62,11 +62,23 @@ export function SetupPermissionsScreen({
   };
 
   return (
-    <ScreenScaffold
-      eyebrow={t('stepOne')}
-      title={t('setupPermissionsTitle')}
-      body={t('setupPermissionsBody')}
-      onOpenSettings={onOpenSettingsMenu}>
+    <View style={styles.scrollContent}>
+      <View style={styles.topBar}>
+        <Text style={styles.eyebrow}>{t('stepOne')}</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenSettingsMenu}
+          style={styles.themeToggle}>
+          <View style={styles.menuIcon}>
+            <View style={styles.menuBar} />
+            <View style={styles.menuBar} />
+            <View style={styles.menuBar} />
+          </View>
+        </Pressable>
+      </View>
+
+      <Text style={styles.title}>{t('setupPermissionsTitle')}</Text>
+      <Text style={styles.body}>{t('setupPermissionsBody')}</Text>
 
       <View style={localStyles.list}>
         {renderPermissionItem(
@@ -105,7 +117,7 @@ export function SetupPermissionsScreen({
           onPress={onContinue}
         />
       </View>
-    </ScreenScaffold>
+    </View>
   );
 }
 

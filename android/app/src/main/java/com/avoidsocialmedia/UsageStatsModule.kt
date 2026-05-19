@@ -6,16 +6,22 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
+import android.util.Base64
 import com.avoidsocialmedia.services.WatchdogService
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import java.io.ByteArrayOutputStream
 import java.util.Calendar
 
 class UsageStatsModule(private val reactContext: ReactApplicationContext) :
@@ -46,6 +52,7 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
             packageName = appInfo.packageName,
             appName = packageManager.getApplicationLabel(appInfo).toString(),
             isSystemApp = appInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0,
+            icon = getAppIconBase64(packageManager, appInfo)
           )
         }
         .distinctBy { it.packageName }
@@ -57,6 +64,7 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
           putString("packageName", app.packageName)
           putString("appName", app.appName)
           putBoolean("isSystemApp", app.isSystemApp)
+          putString("icon", app.icon)
         })
       }
 
@@ -213,6 +221,33 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
+  private fun getAppIconBase64(packageManager: PackageManager, appInfo: ApplicationInfo): String? {
+    return try {
+      val drawable = packageManager.getApplicationIcon(appInfo)
+      val bitmap = drawableToBitmap(drawable)
+      val outputStream = ByteArrayOutputStream()
+      bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+      Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+    } catch (e: Exception) {
+      null
+    }
+  }
+
+  private fun drawableToBitmap(drawable: Drawable): Bitmap {
+    if (drawable is BitmapDrawable) {
+      return drawable.bitmap
+    }
+    val bitmap = Bitmap.createBitmap(
+      drawable.intrinsicWidth.coerceAtLeast(1),
+      drawable.intrinsicHeight.coerceAtLeast(1),
+      Bitmap.Config.ARGB_8888
+    )
+    val canvas = Canvas(bitmap)
+    drawable.setBounds(0, 0, canvas.width, canvas.height)
+    drawable.draw(canvas)
+    return bitmap
+  }
+
   private data class UsageSummary(
     val packageName: String,
     val appName: String,
@@ -224,5 +259,6 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
     val packageName: String,
     val appName: String,
     val isSystemApp: Boolean,
+    val icon: String?,
   )
 }

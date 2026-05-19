@@ -97,13 +97,16 @@ export type TranslationKey =
   | 'notificationLabel'
   | 'notificationDesc'
   | 'grantLabel'
-  | 'allSetLabel';
+  | 'allSetLabel'
+  | 'renownedAppsLabel'
+  | 'otherAppsLabel';
 
 export type TrackableApp = {
   name: string;
   packageName: string;
   category: string;
   accent: string;
+  icon?: string;
   isSystemApp?: boolean;
 };
 
@@ -125,6 +128,7 @@ export type InstalledApp = {
   packageName: string;
   appName: string;
   isSystemApp: boolean;
+  icon?: string;
 };
 
 export type UsageStatsBridge = {

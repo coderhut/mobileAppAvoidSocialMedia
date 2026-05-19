@@ -27,7 +27,11 @@ export function ScreenScaffold({
           accessibilityRole="button"
           onPress={onOpenSettings}
           style={styles.themeToggle}>
-          <Text style={styles.themeToggleText}>{t('settings')}</Text>
+          <View style={styles.menuIcon}>
+            <View style={styles.menuBar} />
+            <View style={styles.menuBar} />
+            <View style={styles.menuBar} />
+          </View>
         </Pressable>
       </View>
       <Text style={styles.title}>{title}</Text>

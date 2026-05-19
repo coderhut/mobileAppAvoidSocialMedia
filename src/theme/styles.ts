@@ -6,7 +6,6 @@ export function createThemedStyles(colors: ThemeColors) {
     safeArea: {
       flex: 1,
       backgroundColor: colors.background,
-      paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
     },
     appShell: {
       flex: 1,
@@ -31,17 +30,19 @@ export function createThemedStyles(colors: ThemeColors) {
       textTransform: 'uppercase',
     },
     themeToggle: {
-      backgroundColor: colors.surfaceAlt,
-      borderColor: colors.border,
-      borderRadius: 8,
-      borderWidth: 1,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      padding: 8,
+    },
+    menuIcon: {
+      gap: 4,
+      width: 24,
+    },
+    menuBar: {
+      backgroundColor: colors.primary,
+      height: 3,
+      width: '100%',
     },
     themeToggleText: {
-      color: colors.text,
-      fontSize: 13,
-      fontWeight: '800',
+      display: 'none',
     },
     modalOverlay: {
       flex: 1,

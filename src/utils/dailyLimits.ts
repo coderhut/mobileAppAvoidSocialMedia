@@ -80,28 +80,17 @@ export function getUsageStatusText(
     isInstalled: boolean;
     usageMs: number;
   },
-  limitSetting: DailyLimitSetting,
   t: (key: TranslationKey) => string,
 ) {
   if (!item.isInstalled) {
     return t('notInstalled');
   }
 
-  if (limitSetting.mode === 'warn') {
-    const remainingMs = limitSetting.limitMinutes * 60000 - item.usageMs;
-
-    if (remainingMs <= 0) {
-      return t('overLimit');
-    }
-
-    return `${formatDuration(remainingMs)} ${t('remaining')}`;
-  }
-
   if (item.usageMs === 0) {
     return t('noUsageToday');
   }
 
-  return item.app?.category ?? t('trackOnly');
+  return item.app?.category ?? t('trackedToday');
 }
 
 function isDailyLimitSetting(value: unknown): value is DailyLimitSetting {

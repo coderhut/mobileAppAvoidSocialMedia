@@ -1,6 +1,8 @@
-import React from 'react';
-import {Modal, Pressable, Text, View} from 'react-native';
+import React, {useEffect, useRef} from 'react';
+import {Animated, Dimensions, Modal, Pressable, Text, View} from 'react-native';
 import {useAppTheme} from '../../theme/ThemeContext';
+
+const {width} = Dimensions.get('window');
 
 export function SettingsPanel({
   isVisible,
@@ -20,18 +22,52 @@ export function SettingsPanel({
     themePreference,
   } = useAppTheme();
 
+  const slideAnim = useRef(new Animated.Value(width)).current;
+
+  useEffect(() => {
+    if (isVisible) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: width,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isVisible, slideAnim]);
+
+  const handleClose = () => {
+    Animated.timing(slideAnim, {
+      toValue: width,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+    });
+  };
+
   return (
     <Modal
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
       transparent
       visible={isVisible}>
       <View style={styles.modalOverlay}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <View style={styles.settingsPanel}>
+        <Pressable style={styles.modalBackdrop} onPress={handleClose} />
+        <Animated.View
+          style={[
+            styles.settingsPanel,
+            {
+              transform: [{translateX: slideAnim}],
+            },
+          ]}>
           <View style={styles.settingsHeader}>
             <Text style={styles.settingsTitle}>{t('settings')}</Text>
-            <Pressable onPress={onClose} style={styles.closeButton}>
+            <Pressable onPress={handleClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>{t('close')}</Text>
             </Pressable>
           </View>
@@ -73,7 +109,7 @@ export function SettingsPanel({
             <View style={{marginTop: 12}}>
               <Pressable
                 onPress={() => {
-                  onClose();
+                  handleClose();
                   onEditRecordings();
                 }}
                 style={styles.secondaryButton}>
@@ -86,7 +122,7 @@ export function SettingsPanel({
             <Text style={styles.noticeTitle}>{t('privacyNoteTitle')}</Text>
             <Text style={styles.noticeText}>{t('privacyNoteBody')}</Text>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

@@ -105,6 +105,8 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     notificationDesc: 'To keep monitoring service active.',
     grantLabel: 'Grant',
     allSetLabel: 'All set!',
+    renownedAppsLabel: 'Social Media & Video',
+    otherAppsLabel: 'Other Apps',
   },
   ur: {
     appName: 'سوشل میڈیا سے بچیں',
@@ -211,5 +213,7 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     notificationDesc: 'مانیٹرنگ سروس کو فعال رکھنے کے لیے۔',
     grantLabel: 'اجازت دیں',
     allSetLabel: 'سب ٹھیک ہے!',
+    renownedAppsLabel: 'سوشل میڈیا اور ویڈیوز',
+    otherAppsLabel: 'دیگر ایپس',
   },
 };

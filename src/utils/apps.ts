@@ -52,6 +52,7 @@ export function toTrackableApp(app: InstalledApp): TrackableApp {
     category: app.isSystemApp ? 'System app' : 'Installed app',
     accent: colorFromPackageName(app.packageName),
     isSystemApp: app.isSystemApp,
+    icon: app.icon,
   };
 }
 
