@@ -1,10 +1,9 @@
 import React, {useMemo} from 'react';
-import {Pressable, Text, View} from 'react-native';
+import {Pressable, Text, View, Image} from 'react-native';
 import {ScreenScaffold} from '../common/ScreenScaffold';
 import {useAppTheme} from '../../theme/ThemeContext';
+import {useSettings} from '../../contexts/SettingsContext';
 import type {
-  DailyLimitSetting,
-  DailyLimitSettings,
   TrackableApp,
   UsageStat,
 } from '../../types';
@@ -18,33 +17,35 @@ import {formatDuration} from '../../utils/duration';
 
 export function DashboardScreen({
   availableApps,
-  dailyLimitSettings,
   hasUsageAccess,
-  selectedPackageNames,
   totalTrackedMs,
   usageByPackage,
   usageError,
   onEditApps,
   onOpenSettings,
   onRefresh,
-  onUpdateDailyLimitSetting,
 }: {
   availableApps: TrackableApp[];
-  dailyLimitSettings: DailyLimitSettings;
   hasUsageAccess: boolean;
-  selectedPackageNames: string[];
   totalTrackedMs: number;
   usageByPackage: Record<string, UsageStat>;
   usageError: string | null;
   onEditApps: () => void;
   onOpenSettings: () => void;
   onRefresh: () => void;
-  onUpdateDailyLimitSetting: (
-    packageName: string,
-    setting: DailyLimitSetting,
-  ) => void;
 }) {
   const {styles, t} = useAppTheme();
+  const {
+    selectedPackageNames,
+    dailyLimitSettings,
+    updateDailyLimitSetting,
+    globalDailyLimit,
+    setGlobalDailyLimit,
+  } = useSettings();
+
+  const nextLowerGlobal = clampLimitMinutes(globalDailyLimit - LIMIT_STEP_MINUTES);
+  const nextHigherGlobal = clampLimitMinutes(globalDailyLimit + LIMIT_STEP_MINUTES);
+
   const installedPackageNames = useMemo(
     () => new Set(availableApps.map(app => app.packageName)),
     [availableApps],
@@ -83,6 +84,35 @@ export function DashboardScreen({
       <View style={styles.metricPanel}>
         <Text style={styles.metricNumber}>{formatDuration(totalTrackedMs)}</Text>
         <Text style={styles.metricLabel}>{t('trackedToday')}</Text>
+      </View>
+
+      <View style={styles.usageCard}>
+        <View style={styles.limitTextGroup}>
+          <Text style={styles.limitTitle}>Collective Daily Limit</Text>
+          <Text style={styles.limitSubtitle}>
+            Voice notes will play after {globalDailyLimit} minutes of total distracting app usage.
+          </Text>
+        </View>
+        <View style={styles.limitStepper}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={nextLowerGlobal === globalDailyLimit}
+            onPress={() => setGlobalDailyLimit(nextLowerGlobal)}
+            style={styles.limitStepButton}>
+            <Text style={styles.limitStepText}>-</Text>
+          </Pressable>
+          <Text style={styles.limitValue}>
+            {globalDailyLimit}
+            {t('minutesShort')}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={nextHigherGlobal === globalDailyLimit}
+            onPress={() => setGlobalDailyLimit(nextHigherGlobal)}
+            style={styles.limitStepButton}>
+            <Text style={styles.limitStepText}>+</Text>
+          </Pressable>
+        </View>
       </View>
 
       {!hasUsageAccess || usageError ? (
@@ -143,9 +173,16 @@ export function DashboardScreen({
                     styles.appIconSmall,
                     {backgroundColor: item.app?.accent ?? '#64748B'},
                   ]}>
-                  <Text style={styles.appIconTextSmall}>
-                    {(item.app?.name ?? '?').charAt(0)}
-                  </Text>
+                  {item.app?.icon ? (
+                    <Image
+                      source={{uri: `data:image/png;base64,${item.app.icon}`}}
+                      style={{width: '100%', height: '100%', borderRadius: 8}}
+                    />
+                  ) : (
+                    <Text style={styles.appIconTextSmall}>
+                      {(item.app?.name ?? '?').charAt(0)}
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.usageTextGroup}>
                   <Text style={styles.usageName}>

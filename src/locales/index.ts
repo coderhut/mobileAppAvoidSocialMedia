@@ -27,6 +27,16 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     permissionTitle: 'Allow usage access so the app can measure screen time.',
     permissionBody:
       'Android requires you to enable usage access from system settings. We only need this to read time spent in the apps you choose.',
+    overlayPermissionTitle: 'Allow display over other apps for interventions.',
+    overlayPermissionBody:
+      'This allows the app to show the "STOP" overlay when you reach your limit. Without this, we can only play audio.',
+    openOverlaySettings: 'Open Overlay Settings',
+    overlayAccessDetected: 'Overlay access detected. Moving to next step...',
+    batteryOptimizationTitle: 'Disable Battery Optimization',
+    batteryOptimizationBody:
+      'To ensure the app can monitor usage in the background without being killed by the system, please disable battery optimization for this app.',
+    openBatterySettings: 'Open Battery Settings',
+    batteryAccessDetected: 'Battery optimization disabled. Moving to next step...',
     whatThisEnables: 'What this enables',
     whatThisEnablesBody:
       'Daily app usage summaries, selected-app tracking, and future reminders or limits.',
@@ -72,6 +82,24 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     trackedApps: 'Tracked apps',
     refresh: 'Refresh',
     edit: 'Edit',
+    stepThree: 'Step 3',
+    recordingsTitle: 'Record your voice notes.',
+    recordingsBody:
+      'These notes will play when you reach your app usage limits. They should be motivational or anything that would stop you from scrolling.',
+    level1Title: 'Level 1: Gentle Reminder',
+    level1Desc: 'Played after your first limit (e.g. 10 mins).',
+    level2Title: 'Level 2: Firm Warning',
+    level2Desc: 'Played after 5 more minutes of scrolling.',
+    level3Title: 'Level 3: Urgent Intervention',
+    level3Desc: 'Played every 3 minutes if you keep scrolling.',
+    holdToRecord: 'Hold to record',
+    releaseToStop: 'Release to stop',
+    required: 'Required',
+    optional: 'Optional',
+    minRecordingsAlert: 'Please record at least one note for each level to proceed.',
+    finishSetup: 'Finish setup',
+    suggestedApps: 'Suggested Apps',
+    otherApps: 'Other Apps',
   },
   ur: {
     appName: 'سوشل میڈیا سے بچیں',
@@ -100,6 +128,16 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     permissionTitle: 'اسکرین ٹائم ناپنے کے لیے usage access دیں۔',
     permissionBody:
       'Android میں usage access سسٹم سیٹنگز سے آن کرنا ہوتا ہے۔ ہمیں صرف منتخب ایپس کا وقت پڑھنے کے لیے یہ اجازت چاہیے۔',
+    overlayPermissionTitle: 'مداخلت کے لیے "دوسری ایپس پر ڈسپلے" کی اجازت دیں۔',
+    overlayPermissionBody:
+      'یہ ایپ کو آپ کی حد تک پہنچنے پر "STOP" اوورلے دکھانے کی اجازت دیتا ہے۔ اس کے بغیر، ہم صرف آڈیو چلا سکتے ہیں۔',
+    openOverlaySettings: 'اوورلے سیٹنگز کھولیں',
+    overlayAccessDetected: 'اوورلے رسائی مل گئی۔ اگلے مرحلے پر جا رہے ہیں...',
+    batteryOptimizationTitle: 'بیٹری آپٹیمائزیشن کو غیر فعال کریں',
+    batteryOptimizationBody:
+      'اس بات کو یقینی بنانے کے لیے کہ ایپ سسٹم کے ذریعے ختم کیے بغیر پس منظر میں استعمال کی نگرانی کر سکے، براہ کرم اس ایپ کے لیے بیٹری آپٹیمائزیشن کو غیر فعال کر دیں۔',
+    openBatterySettings: 'بیٹری کی ترتیبات کھولیں',
+    batteryAccessDetected: 'بیٹری کی اصلاح غیر فعال ہے۔ اگلے مرحلے پر جا رہے ہیں...',
     whatThisEnables: 'یہ کیا ممکن بناتا ہے',
     whatThisEnablesBody:
       'روزانہ app usage summary، منتخب ایپس کی tracking، اور بعد میں reminders یا limits۔',
@@ -145,5 +183,23 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     trackedApps: 'Tracked apps',
     refresh: 'Refresh',
     edit: 'Edit',
+    stepThree: 'مرحلہ 3',
+    recordingsTitle: 'اپنی آواز ریکارڈ کریں۔',
+    recordingsBody:
+      'یہ آوازیں تب چلیں گی جب آپ اپنی ایپ کے استعمال کی حد تک پہنچ جائیں گے۔ یہ آپ کو اسکرولنگ روکنے میں مدد کریں گی۔',
+    level1Title: 'لیول 1: نرم یاد دہانی',
+    level1Desc: 'پہلی حد کے بعد چلائی جائے گی۔',
+    level2Title: 'لیول 2: سخت وارننگ',
+    level2Desc: 'مزید 5 منٹ اسکرولنگ کے بعد چلائی جائے گی۔',
+    level3Title: 'لیول 3: ہنگامی مداخلت',
+    level3Desc: 'اگر آپ اسکرولنگ جاری رکھیں گے تو ہر 3 منٹ بعد چلے گی۔',
+    holdToRecord: 'ریکارڈ کرنے کے لیے دبا کر رکھیں',
+    releaseToStop: 'روکنے کے لیے چھوڑ دیں',
+    required: 'لازمی',
+    optional: 'اختیاری',
+    minRecordingsAlert: 'براہ کرم آگے بڑھنے کے لیے ہر لیول کے لیے کم از کم ایک آواز ریکارڈ کریں۔',
+    finishSetup: 'سیٹ اپ مکمل کریں',
+    suggestedApps: 'تجویز کردہ ایپس',
+    otherApps: 'دیگر ایپس',
   },
 };

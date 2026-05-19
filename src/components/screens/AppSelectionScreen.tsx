@@ -1,29 +1,69 @@
 import React from 'react';
-import {FlatList, Pressable, Text, View} from 'react-native';
+import {SectionList, Pressable, Text, View, Image} from 'react-native';
 import {PrimaryButton} from '../common/PrimaryButton';
 import {useAppTheme} from '../../theme/ThemeContext';
+import {useSettings} from '../../contexts/SettingsContext';
 import type {TrackableApp} from '../../types';
+
+const RENOWNED_APPS = [
+  'com.instagram.android',
+  'com.instagram.lite',
+  'com.zhiliaoapp.musically',
+  'com.zhiliaoapp.musically.go',
+  'com.ss.android.ugc.trill',
+  'com.facebook.katana',
+  'com.facebook.lite',
+  'com.google.android.youtube',
+  'com.google.android.apps.youtube.mango',
+  'com.snapchat.android',
+  'com.twitter.android',
+  'com.twitter.android.lite',
+  'com.reddit.frontpage',
+  'com.pinterest',
+  'com.linkedin.android',
+  'com.netflix.mediaclient',
+];
 
 export function AppSelectionScreen({
   availableApps,
   isLoadingApps,
   onOpenSettings,
-  onToggleApp,
   onContinue,
-  selectedPackageNames,
 }: {
   availableApps: TrackableApp[];
   isLoadingApps: boolean;
   onOpenSettings: () => void;
-  onToggleApp: (packageName: string) => void;
   onContinue: () => void;
-  selectedPackageNames: string[];
 }) {
-  const {styles, t} = useAppTheme();
+  const {colors, styles, t} = useAppTheme();
+  const {selectedPackageNames, toggleApp} = useSettings();
+
   const selectedPackageSet = React.useMemo(
     () => new Set(selectedPackageNames),
     [selectedPackageNames],
   );
+
+  const sections = React.useMemo(() => {
+    const renowned: TrackableApp[] = [];
+    const others: TrackableApp[] = [];
+
+    availableApps.forEach(app => {
+      if (RENOWNED_APPS.includes(app.packageName)) {
+        renowned.push(app);
+      } else {
+        others.push(app);
+      }
+    });
+
+    const result = [];
+    if (renowned.length > 0) {
+      result.push({title: t('suggestedApps'), data: renowned});
+    }
+    if (others.length > 0) {
+      result.push({title: t('otherApps'), data: others});
+    }
+    return result;
+  }, [availableApps, t]);
 
   const renderAppRow = React.useCallback(
     ({item: app}: {item: TrackableApp}) => {
@@ -33,10 +73,17 @@ export function AppSelectionScreen({
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{checked: isSelected}}
-          onPress={() => onToggleApp(app.packageName)}
+          onPress={() => toggleApp(app.packageName)}
           style={[styles.appRow, isSelected && styles.appRowSelected]}>
           <View style={[styles.appIcon, {backgroundColor: app.accent}]}>
-            <Text style={styles.appIconText}>{app.name.charAt(0)}</Text>
+            {app.icon ? (
+              <Image
+                source={{uri: `data:image/png;base64,${app.icon}`}}
+                style={{width: '100%', height: '100%', borderRadius: 8}}
+              />
+            ) : (
+              <Text style={styles.appIconText}>{app.name.charAt(0)}</Text>
+            )}
           </View>
           <View style={styles.appTextGroup}>
             <Text style={styles.appName}>{app.name}</Text>
@@ -48,16 +95,21 @@ export function AppSelectionScreen({
         </Pressable>
       );
     },
-    [onToggleApp, selectedPackageSet, styles, t],
+    [toggleApp, selectedPackageSet, styles, t],
   );
 
   return (
-    <FlatList
+    <SectionList
       contentContainerStyle={styles.scrollContent}
-      data={availableApps}
+      sections={sections}
       initialNumToRender={20}
       ItemSeparatorComponent={AppListSeparator}
       keyExtractor={app => app.packageName}
+      renderSectionHeader={({section: {title}}) => (
+        <View style={{backgroundColor: colors.background, paddingVertical: 12}}>
+          <Text style={[styles.sectionTitle, {color: colors.primary}]}>{title}</Text>
+        </View>
+      )}
       ListFooterComponent={
         <PrimaryButton
           disabled={selectedPackageNames.length === 0}
@@ -85,7 +137,7 @@ export function AppSelectionScreen({
           ) : null}
         </>
       }
-      maxToRenderPerBatch={20}
+      stickySectionHeadersEnabled={true}
       renderItem={renderAppRow}
       showsVerticalScrollIndicator={false}
       windowSize={9}

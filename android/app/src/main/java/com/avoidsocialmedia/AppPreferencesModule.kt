@@ -21,6 +21,8 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
         putString("themePreference", preferences.getString("themePreference", "system"))
         putString("language", preferences.getString("language", "en"))
         putString("dailyLimitSettings", preferences.getString("dailyLimitSettings", "{}"))
+        putString("voiceNotes", preferences.getString("voiceNotes", "{}"))
+        putInt("globalDailyLimit", preferences.getInt("globalDailyLimit", 0))
         putArray(
           "selectedPackageNames",
           packageNamesToArray(preferences.getString("selectedPackageNames", "[]")),
@@ -65,6 +67,21 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
   @ReactMethod
   fun setDailyLimitSettings(settingsJson: String, promise: Promise) {
     saveString("dailyLimitSettings", settingsJson, promise)
+  }
+
+  @ReactMethod
+  fun setVoiceNotes(voiceNotesJson: String, promise: Promise) {
+    saveString("voiceNotes", voiceNotesJson, promise)
+  }
+
+  @ReactMethod
+  fun setGlobalDailyLimit(limitMinutes: Int, promise: Promise) {
+    try {
+      getSharedPreferences().edit().putInt("globalDailyLimit", limitMinutes).apply()
+      promise.resolve(null)
+    } catch (error: Exception) {
+      promise.reject("PREFERENCES_WRITE_FAILED", error)
+    }
   }
 
   private fun saveString(key: String, value: String, promise: Promise) {

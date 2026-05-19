@@ -1,5 +1,5 @@
 import {NativeModules} from 'react-native';
-import type {AppPreferencesBridge, UsageStatsBridge} from '../types';
+import type {AppPreferencesBridge, AudioBridge, UsageStatsBridge} from '../types';
 
 export const UsageStatsModule = NativeModules.UsageStatsModule as
   | UsageStatsBridge
@@ -7,4 +7,8 @@ export const UsageStatsModule = NativeModules.UsageStatsModule as
 
 export const AppPreferencesModule = NativeModules.AppPreferencesModule as
   | AppPreferencesBridge
+  | undefined;
+
+export const AudioModule = NativeModules.AudioModule as
+  | AudioBridge
   | undefined;

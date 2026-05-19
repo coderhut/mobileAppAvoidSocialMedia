@@ -1,4 +1,11 @@
-export type Step = 'onboarding' | 'permission' | 'apps' | 'dashboard';
+export type Step =
+  | 'onboarding'
+  | 'battery'
+  | 'overlay'
+  | 'permission'
+  | 'apps'
+  | 'recordings'
+  | 'dashboard';
 export type ThemeMode = 'light' | 'dark';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type LanguageCode = 'en' | 'ur';
@@ -28,6 +35,10 @@ export type TranslationKey =
   | 'stepOne'
   | 'permissionTitle'
   | 'permissionBody'
+  | 'overlayPermissionTitle'
+  | 'overlayPermissionBody'
+  | 'openOverlaySettings'
+  | 'overlayAccessDetected'
   | 'whatThisEnables'
   | 'whatThisEnablesBody'
   | 'openUsageAccessSettings'
@@ -66,7 +77,24 @@ export type TranslationKey =
   | 'minutesShort'
   | 'trackedApps'
   | 'refresh'
-  | 'edit';
+  | 'edit'
+  | 'stepThree'
+  | 'recordingsTitle'
+  | 'recordingsBody'
+  | 'level1Title'
+  | 'level1Desc'
+  | 'level2Title'
+  | 'level2Desc'
+  | 'level3Title'
+  | 'level3Desc'
+  | 'holdToRecord'
+  | 'releaseToStop'
+  | 'required'
+  | 'optional'
+  | 'minRecordingsAlert'
+  | 'finishSetup'
+  | 'suggestedApps'
+  | 'otherApps';
 
 export type TrackableApp = {
   name: string;
@@ -74,6 +102,7 @@ export type TrackableApp = {
   category: string;
   accent: string;
   isSystemApp?: boolean;
+  icon?: string | null;
 };
 
 export type UsageStat = {
@@ -94,12 +123,26 @@ export type InstalledApp = {
   packageName: string;
   appName: string;
   isSystemApp: boolean;
+  icon?: string | null;
 };
 
 export type UsageStatsBridge = {
   getInstalledApps: () => Promise<InstalledApp[]>;
   hasUsageAccess: () => Promise<boolean>;
   getTodayUsageStats: () => Promise<UsageStat[]>;
+  hasOverlayPermission: () => Promise<boolean>;
+  requestOverlayPermission: () => Promise<void>;
+  startWatchdogService: () => Promise<void>;
+  stopWatchdogService: () => Promise<void>;
+  isIgnoringBatteryOptimizations: () => Promise<boolean>;
+  requestIgnoreBatteryOptimizations: () => Promise<void>;
+};
+
+export type AudioBridge = {
+  startRecording: (path: String) => Promise<string>;
+  stopRecording: () => Promise<void>;
+  startPlayer: (path: string) => Promise<void>;
+  stopPlayer: () => Promise<void>;
 };
 
 export type AppPreferences = {
@@ -107,6 +150,8 @@ export type AppPreferences = {
   language?: string;
   selectedPackageNames?: string[];
   dailyLimitSettings?: string;
+  voiceNotes?: string; // JSON string of Record<string, string[]> (level -> filePaths)
+  globalDailyLimit?: number; // In minutes
 };
 
 export type AppPreferencesBridge = {
@@ -115,6 +160,8 @@ export type AppPreferencesBridge = {
   setLanguage: (language: LanguageCode) => Promise<void>;
   setSelectedPackageNames: (packageNames: string[]) => Promise<void>;
   setDailyLimitSettings: (settingsJson: string) => Promise<void>;
+  setVoiceNotes: (voiceNotesJson: string) => Promise<void>;
+  setGlobalDailyLimit: (limitMinutes: number) => Promise<void>;
 };
 
 export type ThemeColors = {

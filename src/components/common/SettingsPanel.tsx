@@ -5,9 +5,11 @@ import {useAppTheme} from '../../theme/ThemeContext';
 export function SettingsPanel({
   isVisible,
   onClose,
+  onEditRecordings,
 }: {
   isVisible: boolean;
   onClose: () => void;
+  onEditRecordings?: () => void;
 }) {
   const {
     language,
@@ -66,6 +68,19 @@ export function SettingsPanel({
               onPress={() => setLanguage('ur')}
             />
           </View>
+
+          {onEditRecordings && (
+            <View style={{marginTop: 12}}>
+              <Pressable
+                onPress={() => {
+                  onClose();
+                  onEditRecordings();
+                }}
+                style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>{t('recordingsTitle')}</Text>
+              </Pressable>
+            </View>
+          )}
 
           <View style={styles.privacyBox}>
             <Text style={styles.noticeTitle}>{t('privacyNoteTitle')}</Text>

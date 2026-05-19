@@ -10,17 +10,19 @@ import {
 } from 'react-native';
 import {SettingsPanel} from './src/components/common/SettingsPanel';
 import {AppSelectionScreen} from './src/components/screens/AppSelectionScreen';
+import {BatteryOptimizationScreen} from './src/components/screens/BatteryOptimizationScreen';
 import {DashboardScreen} from './src/components/screens/DashboardScreen';
 import {IntroScreen} from './src/components/screens/IntroScreen';
+import {OverlayPermissionScreen} from './src/components/screens/OverlayPermissionScreen';
 import {PermissionScreen} from './src/components/screens/PermissionScreen';
+import {VoiceRecordingScreen} from './src/components/screens/VoiceRecordingScreen';
 import {TRANSLATIONS} from './src/locales';
-import {AppPreferencesModule, UsageStatsModule} from './src/native/modules';
+import {UsageStatsModule} from './src/native/modules';
 import {AppThemeContext, useAppTheme} from './src/theme/ThemeContext';
 import {DARK_COLORS, LIGHT_COLORS} from './src/theme/colors';
 import {createThemedStyles} from './src/theme/styles';
+import {SettingsProvider, useSettings} from './src/contexts/SettingsContext';
 import type {
-  DailyLimitSetting,
-  DailyLimitSettings,
   LanguageCode,
   Step,
   ThemeMode,
@@ -30,16 +32,18 @@ import type {
   UsageStat,
 } from './src/types';
 import {FALLBACK_TRACKABLE_APPS, toTrackableApp} from './src/utils/apps';
-import {
-  normalizeDailyLimitSetting,
-  parseDailyLimitSettings,
-} from './src/utils/dailyLimits';
 
 function App() {
+  return (
+    <SettingsProvider>
+      <ThemedApp />
+    </SettingsProvider>
+  );
+}
+
+function ThemedApp() {
+  const {themePreference, language, setLanguage, setThemePreference} = useSettings();
   const systemScheme = useColorScheme();
-  const [themePreference, setThemePreference] =
-    useState<ThemePreference>('system');
-  const [language, setLanguage] = useState<LanguageCode>('en');
   const themeMode: ThemeMode =
     themePreference === 'system'
       ? systemScheme === 'dark'
@@ -49,64 +53,28 @@ function App() {
 
   const colors = themeMode === 'dark' ? DARK_COLORS : LIGHT_COLORS;
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
-  const handleSetLanguage = React.useCallback((nextLanguage: LanguageCode) => {
-    setLanguage(nextLanguage);
-    AppPreferencesModule?.setLanguage(nextLanguage).catch(() => undefined);
-  }, []);
-  const handleSetThemePreference = React.useCallback(
-    (nextThemePreference: ThemePreference) => {
-      setThemePreference(nextThemePreference);
-      AppPreferencesModule?.setThemePreference(nextThemePreference).catch(
-        () => undefined,
-      );
-    },
-    [],
-  );
+
   const theme = useMemo(
     () => ({
       colors,
       language,
       mode: themeMode,
-      setLanguage: handleSetLanguage,
-      setThemePreference: handleSetThemePreference,
+      setLanguage,
+      setThemePreference,
       styles,
       t: (key: TranslationKey) => TRANSLATIONS[language][key],
       themePreference,
     }),
     [
       colors,
-      handleSetLanguage,
-      handleSetThemePreference,
       language,
+      setLanguage,
+      setThemePreference,
       styles,
       themeMode,
       themePreference,
     ],
   );
-
-  React.useEffect(() => {
-    let isMounted = true;
-
-    AppPreferencesModule?.getPreferences()
-      .then(preferences => {
-        if (!isMounted) {
-          return;
-        }
-
-        if (isThemePreference(preferences.themePreference)) {
-          setThemePreference(preferences.themePreference);
-        }
-
-        if (isLanguageCode(preferences.language)) {
-          setLanguage(preferences.language);
-        }
-      })
-      .catch(() => undefined);
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   return (
     <AppThemeContext.Provider value={theme}>
@@ -121,6 +89,7 @@ function App() {
 
 function AppContent() {
   const {styles, t} = useAppTheme();
+  const {selectedPackageNames} = useSettings();
   const [step, setStep] = useState<Step>('onboarding');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [availableApps, setAvailableApps] = useState<TrackableApp[]>(
@@ -128,15 +97,13 @@ function AppContent() {
   );
   const [isLoadingApps, setIsLoadingApps] = useState(false);
   const [hasUsageAccess, setHasUsageAccess] = useState(false);
+  const [hasOverlayAccess, setHasOverlayAccess] = useState(false);
+  const [isIgnoringBatteryOptimizations, setIsIgnoringBatteryOptimizations] = useState(false);
   const [isCheckingAccess, setIsCheckingAccess] = useState(false);
+  const [isCheckingOverlay, setIsCheckingOverlay] = useState(false);
+  const [isCheckingBattery, setIsCheckingBattery] = useState(false);
   const [usageStats, setUsageStats] = useState<UsageStat[]>([]);
   const [usageError, setUsageError] = useState<string | null>(null);
-  const [dailyLimitSettings, setDailyLimitSettings] =
-    useState<DailyLimitSettings>({});
-  const [selectedPackageNames, setSelectedPackageNames] = useState<string[]>([
-    'com.instagram.android',
-    'com.google.android.youtube',
-  ]);
 
   const selectedApps = useMemo(
     () =>
@@ -155,39 +122,11 @@ function AppContent() {
     }, {});
   }, [usageStats]);
 
-  const totalTrackedMs = selectedApps.reduce((total, app) => {
-    return total + (usageByPackage[app.packageName]?.totalTimeMs ?? 0);
-  }, 0);
-
-  function toggleApp(packageName: string) {
-    setSelectedPackageNames(current => {
-      const nextPackageNames = current.includes(packageName)
-        ? current.filter(selectedPackageName => selectedPackageName !== packageName)
-        : [...current, packageName];
-
-      AppPreferencesModule?.setSelectedPackageNames(nextPackageNames).catch(
-        () => undefined,
-      );
-      return nextPackageNames;
-    });
-  }
-
-  function updateDailyLimitSetting(
-    packageName: string,
-    setting: DailyLimitSetting,
-  ) {
-    setDailyLimitSettings(current => {
-      const nextSettings = {
-        ...current,
-        [packageName]: normalizeDailyLimitSetting(setting),
-      };
-
-      AppPreferencesModule?.setDailyLimitSettings(
-        JSON.stringify(nextSettings),
-      ).catch(() => undefined);
-      return nextSettings;
-    });
-  }
+  const totalTrackedMs = useMemo(() => {
+    return selectedPackageNames.reduce((total, packageName) => {
+      return total + (usageByPackage[packageName]?.totalTimeMs ?? 0);
+    }, 0);
+  }, [selectedPackageNames, usageByPackage]);
 
   async function openUsageAccessSettings() {
     if (Platform.OS !== 'android') {
@@ -222,6 +161,54 @@ function AppContent() {
       setIsCheckingAccess(false);
     }
   }, [t]);
+
+  const refreshOverlayAccess = React.useCallback(async () => {
+    if (Platform.OS !== 'android' || !UsageStatsModule) {
+      return false;
+    }
+
+    setIsCheckingOverlay(true);
+    try {
+      const nextHasOverlayAccess = await UsageStatsModule.hasOverlayPermission();
+      setHasOverlayAccess(nextHasOverlayAccess);
+      return nextHasOverlayAccess;
+    } catch {
+      return false;
+    } finally {
+      setIsCheckingOverlay(false);
+    }
+  }, []);
+
+  async function openOverlaySettings() {
+    if (Platform.OS !== 'android' || !UsageStatsModule) {
+      return;
+    }
+    await UsageStatsModule.requestOverlayPermission();
+  }
+
+  const refreshBatteryAccess = React.useCallback(async () => {
+    if (Platform.OS !== 'android' || !UsageStatsModule) {
+      return false;
+    }
+
+    setIsCheckingBattery(true);
+    try {
+      const nextHasBatteryAccess = await UsageStatsModule.isIgnoringBatteryOptimizations();
+      setIsIgnoringBatteryOptimizations(nextHasBatteryAccess);
+      return nextHasBatteryAccess;
+    } catch {
+      return false;
+    } finally {
+      setIsCheckingBattery(false);
+    }
+  }, []);
+
+  async function openBatterySettings() {
+    if (Platform.OS !== 'android' || !UsageStatsModule) {
+      return;
+    }
+    await UsageStatsModule.requestIgnoreBatteryOptimizations();
+  }
 
   const refreshUsageStats = React.useCallback(async () => {
     if (Platform.OS !== 'android' || !UsageStatsModule) {
@@ -260,36 +247,46 @@ function AppContent() {
   }, []);
 
   React.useEffect(() => {
+    if (hasUsageAccess && hasOverlayAccess && step === 'dashboard') {
+      UsageStatsModule?.startWatchdogService().catch(() => undefined);
+    }
+  }, [hasUsageAccess, hasOverlayAccess, step]);
+
+  React.useEffect(() => {
     refreshUsageAccess();
+    refreshOverlayAccess();
+    refreshBatteryAccess();
     loadInstalledApps();
-
-    AppPreferencesModule?.getPreferences()
-      .then(preferences => {
-        if (Array.isArray(preferences.selectedPackageNames)) {
-          setSelectedPackageNames(preferences.selectedPackageNames);
-        }
-
-        setDailyLimitSettings(
-          parseDailyLimitSettings(preferences.dailyLimitSettings),
-        );
-      })
-      .catch(() => undefined);
 
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
         refreshUsageAccess();
+        refreshOverlayAccess();
+        refreshBatteryAccess();
         loadInstalledApps();
       }
     });
 
     return () => subscription.remove();
-  }, [loadInstalledApps, refreshUsageAccess]);
+  }, [loadInstalledApps, refreshUsageAccess, refreshOverlayAccess, refreshBatteryAccess]);
 
   React.useEffect(() => {
     if (hasUsageAccess) {
       refreshUsageStats();
     }
   }, [hasUsageAccess, refreshUsageStats]);
+
+  React.useEffect(() => {
+    if (step === 'battery' && isIgnoringBatteryOptimizations) {
+      setStep('overlay');
+    }
+  }, [isIgnoringBatteryOptimizations, step]);
+
+  React.useEffect(() => {
+    if (step === 'overlay' && hasOverlayAccess) {
+      setStep('permission');
+    }
+  }, [hasOverlayAccess, step]);
 
   React.useEffect(() => {
     if (step === 'permission' && hasUsageAccess) {
@@ -301,9 +298,31 @@ function AppContent() {
     if (step === 'onboarding') {
       return (
         <IntroScreen
-          onContinue={() => setStep('permission')}
+          onContinue={() => setStep('battery')}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onSkipToDashboard={() => setStep('dashboard')}
+        />
+      );
+    }
+
+    if (step === 'battery') {
+      return (
+        <BatteryOptimizationScreen
+          isIgnoringBatteryOptimizations={isIgnoringBatteryOptimizations}
+          isCheckingAccess={isCheckingBattery}
+          onOpenSettings={openBatterySettings}
+          onOpenSettingsMenu={() => setIsSettingsOpen(true)}
+        />
+      );
+    }
+
+    if (step === 'overlay') {
+      return (
+        <OverlayPermissionScreen
+          hasOverlayAccess={hasOverlayAccess}
+          isCheckingAccess={isCheckingOverlay}
+          onOpenSettings={openOverlaySettings}
+          onOpenSettingsMenu={() => setIsSettingsOpen(true)}
         />
       );
     }
@@ -325,9 +344,16 @@ function AppContent() {
           availableApps={availableApps}
           isLoadingApps={isLoadingApps}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onToggleApp={toggleApp}
+          onContinue={() => setStep('recordings')}
+        />
+      );
+    }
+
+    if (step === 'recordings') {
+      return (
+        <VoiceRecordingScreen
           onContinue={() => setStep('dashboard')}
-          selectedPackageNames={selectedPackageNames}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       );
     }
@@ -335,16 +361,13 @@ function AppContent() {
     return (
       <DashboardScreen
         availableApps={availableApps}
-        dailyLimitSettings={dailyLimitSettings}
         hasUsageAccess={hasUsageAccess}
-        selectedPackageNames={selectedPackageNames}
         totalTrackedMs={totalTrackedMs}
         usageByPackage={usageByPackage}
         usageError={usageError}
         onEditApps={() => setStep('apps')}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onRefresh={refreshUsageStats}
-        onUpdateDailyLimitSetting={updateDailyLimitSetting}
       />
     );
   }
@@ -355,17 +378,10 @@ function AppContent() {
       <SettingsPanel
         isVisible={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        onEditRecordings={() => setStep('recordings')}
       />
     </View>
   );
-}
-
-function isThemePreference(value: unknown): value is ThemePreference {
-  return value === 'system' || value === 'light' || value === 'dark';
-}
-
-function isLanguageCode(value: unknown): value is LanguageCode {
-  return value === 'en' || value === 'ur';
 }
 
 export default App;
