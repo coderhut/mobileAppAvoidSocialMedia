@@ -1,36 +1,35 @@
-import React, {useMemo, useState} from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   AppState,
   Linking,
+  PermissionsAndroid,
   Platform,
   StatusBar,
   View,
   useColorScheme,
 } from 'react-native';
-import {SettingsPanel} from './src/components/common/SettingsPanel';
-import {AppSelectionScreen} from './src/components/screens/AppSelectionScreen';
-import {DashboardScreen} from './src/components/screens/DashboardScreen';
-import {IntroScreen} from './src/components/screens/IntroScreen';
-import {SetupPermissionsScreen} from './src/components/screens/SetupPermissionsScreen';
-import {VoiceRecordingScreen} from './src/components/screens/VoiceRecordingScreen';
-import {TRANSLATIONS} from './src/locales';
-import {UsageStatsModule} from './src/native/modules';
-import {AppThemeContext, useAppTheme} from './src/theme/ThemeContext';
-import {DARK_COLORS, LIGHT_COLORS} from './src/theme/colors';
-import {createThemedStyles} from './src/theme/styles';
-import {SettingsProvider, useSettings} from './src/contexts/SettingsContext';
-import {PermissionsAndroid} from 'react-native';
+import { SettingsPanel } from './src/components/common/SettingsPanel';
+import { AppSelectionScreen } from './src/components/screens/AppSelectionScreen';
+import { DashboardScreen } from './src/components/screens/DashboardScreen';
+import { IntroScreen } from './src/components/screens/IntroScreen';
+import { LanguageSelectionScreen } from './src/components/screens/LanguageSelectionScreen';
+import { SetupPermissionsScreen } from './src/components/screens/SetupPermissionsScreen';
+import { VoiceRecordingScreen } from './src/components/screens/VoiceRecordingScreen';
+import { TRANSLATIONS } from './src/locales';
+import { UsageStatsModule } from './src/native/modules';
+import { AppThemeContext, useAppTheme } from './src/theme/ThemeContext';
+import { DARK_COLORS, LIGHT_COLORS } from './src/theme/colors';
+import { createThemedStyles } from './src/theme/styles';
+import { SettingsProvider, useSettings } from './src/contexts/SettingsContext';
 import type {
-  LanguageCode,
   Step,
   ThemeMode,
-  ThemePreference,
   TrackableApp,
   TranslationKey,
   UsageStat,
 } from './src/types';
-import {FALLBACK_TRACKABLE_APPS, toTrackableApp} from './src/utils/apps';
+import { FALLBACK_TRACKABLE_APPS, toTrackableApp } from './src/utils/apps';
 
 function App() {
   return (
@@ -41,7 +40,8 @@ function App() {
 }
 
 function ThemedApp() {
-  const {themePreference, language, setLanguage, setThemePreference} = useSettings();
+  const { themePreference, language, setLanguage, setThemePreference } =
+    useSettings();
   const systemScheme = useColorScheme();
   const themeMode: ThemeMode =
     themePreference === 'system'
@@ -87,9 +87,14 @@ function ThemedApp() {
 }
 
 function AppContent() {
-  const {styles, t} = useAppTheme();
-  const {selectedPackageNames} = useSettings();
-  const [step, setStep] = useState<Step>('onboarding');
+  const { styles, t } = useAppTheme();
+  const {
+    selectedPackageNames,
+    setLanguage,
+    hasCompletedOnboarding,
+    setHasCompletedOnboarding,
+  } = useSettings();
+  const [step, setStep] = useState<Step>('language');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [availableApps, setAvailableApps] = useState<TrackableApp[]>(
     FALLBACK_TRACKABLE_APPS,
@@ -99,19 +104,9 @@ function AppContent() {
   const [hasOverlayAccess, setHasOverlayAccess] = useState(false);
   const [hasNotificationAccess, setHasNotificationAccess] = useState(false);
   const [hasMicrophoneAccess, setHasMicrophoneAccess] = useState(false);
-  const [isCheckingAccess, setIsCheckingAccess] = useState(false);
+  const [_isCheckingAccess, setIsCheckingAccess] = useState(false);
   const [usageStats, setUsageStats] = useState<UsageStat[]>([]);
   const [usageError, setUsageError] = useState<string | null>(null);
-
-  const selectedApps = useMemo(
-    () =>
-      selectedPackageNames
-        .map(packageName =>
-          availableApps.find(app => app.packageName === packageName),
-        )
-        .filter((app): app is TrackableApp => Boolean(app)),
-    [availableApps, selectedPackageNames],
-  );
 
   const usageByPackage = useMemo(() => {
     return usageStats.reduce<Record<string, UsageStat>>((accumulator, stat) => {
@@ -166,7 +161,8 @@ function AppContent() {
     }
 
     try {
-      const nextHasOverlayAccess = await UsageStatsModule.hasOverlayPermission();
+      const nextHasOverlayAccess =
+        await UsageStatsModule.hasOverlayPermission();
       setHasOverlayAccess(nextHasOverlayAccess);
       return nextHasOverlayAccess;
     } catch {
@@ -188,7 +184,9 @@ function AppContent() {
   const refreshMicrophoneAccess = React.useCallback(async () => {
     if (Platform.OS !== 'android') return false;
     try {
-      const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+      const granted = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+      );
       setHasMicrophoneAccess(granted);
       return granted;
     } catch {
@@ -199,7 +197,9 @@ function AppContent() {
   const requestMicrophoneAccess = async () => {
     if (Platform.OS !== 'android') return;
     try {
-      await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+      await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+      );
       refreshMicrophoneAccess();
     } catch (err) {
       console.warn(err);
@@ -210,7 +210,9 @@ function AppContent() {
     if (Platform.OS !== 'android') return;
     try {
       if (Platform.Version >= 33) {
-        await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS' as any);
+        await PermissionsAndroid.request(
+          'android.permission.POST_NOTIFICATIONS' as any,
+        );
       }
       refreshNotificationAccess();
     } catch (err) {
@@ -285,7 +287,13 @@ function AppContent() {
     });
 
     return () => subscription.remove();
-  }, [loadInstalledApps, refreshUsageAccess, refreshOverlayAccess, refreshNotificationAccess, refreshMicrophoneAccess]);
+  }, [
+    loadInstalledApps,
+    refreshUsageAccess,
+    refreshOverlayAccess,
+    refreshNotificationAccess,
+    refreshMicrophoneAccess,
+  ]);
 
   React.useEffect(() => {
     if (hasUsageAccess) {
@@ -293,13 +301,52 @@ function AppContent() {
     }
   }, [hasUsageAccess, refreshUsageStats]);
 
+  React.useEffect(() => {
+    if (hasCompletedOnboarding) {
+      setStep('dashboard');
+    }
+  }, [hasCompletedOnboarding]);
+
   function renderContent() {
+    if (step === 'language') {
+      return (
+        <LanguageSelectionScreen
+          onSelect={lang => {
+            setLanguage(lang);
+            setStep('onboarding');
+          }}
+        />
+      );
+    }
+
     if (step === 'onboarding') {
       return (
         <IntroScreen
-          onContinue={() => setStep('setup_permissions')}
+          onContinue={() => setStep('recordings')}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onSkipToDashboard={() => setStep('dashboard')}
+          hideHeader={!hasCompletedOnboarding}
+        />
+      );
+    }
+
+    if (step === 'recordings') {
+      return (
+        <VoiceRecordingScreen
+          onContinue={() => setStep('apps')}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          hideHeader={!hasCompletedOnboarding}
+        />
+      );
+    }
+
+    if (step === 'apps') {
+      return (
+        <AppSelectionScreen
+          availableApps={availableApps}
+          isLoadingApps={isLoadingApps}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onContinue={() => setStep('setup_permissions')}
+          hideHeader={!hasCompletedOnboarding}
         />
       );
     }
@@ -315,28 +362,12 @@ function AppContent() {
           onOpenOverlaySettings={openOverlaySettings}
           requestMicrophone={requestMicrophoneAccess}
           requestNotifications={requestNotificationAccess}
-          onContinue={() => setStep('apps')}
           onOpenSettingsMenu={() => setIsSettingsOpen(true)}
-        />
-      );
-    }
-
-    if (step === 'apps') {
-      return (
-        <AppSelectionScreen
-          availableApps={availableApps}
-          isLoadingApps={isLoadingApps}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onContinue={() => setStep('recordings')}
-        />
-      );
-    }
-
-    if (step === 'recordings') {
-      return (
-        <VoiceRecordingScreen
-          onContinue={() => setStep('dashboard')}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          onContinue={() => {
+            setHasCompletedOnboarding(true);
+            setStep('dashboard');
+          }}
+          hideHeader={!hasCompletedOnboarding}
         />
       );
     }

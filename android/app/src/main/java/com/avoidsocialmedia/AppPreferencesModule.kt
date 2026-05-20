@@ -23,6 +23,7 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
         putString("dailyLimitSettings", preferences.getString("dailyLimitSettings", "{}"))
         putString("voiceNotes", preferences.getString("voiceNotes", "{}"))
         putInt("globalDailyLimit", preferences.getInt("globalDailyLimit", 0))
+        putBoolean("hasCompletedOnboarding", preferences.getBoolean("hasCompletedOnboarding", false))
         putArray(
           "selectedPackageNames",
           packageNamesToArray(preferences.getString("selectedPackageNames", "[]")),
@@ -78,6 +79,16 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
   fun setGlobalDailyLimit(limitMinutes: Int, promise: Promise) {
     try {
       getSharedPreferences().edit().putInt("globalDailyLimit", limitMinutes).apply()
+      promise.resolve(null)
+    } catch (error: Exception) {
+      promise.reject("PREFERENCES_WRITE_FAILED", error)
+    }
+  }
+
+  @ReactMethod
+  fun setHasCompletedOnboarding(completed: Boolean, promise: Promise) {
+    try {
+      getSharedPreferences().edit().putBoolean("hasCompletedOnboarding", completed).apply()
       promise.resolve(null)
     } catch (error: Exception) {
       promise.reject("PREFERENCES_WRITE_FAILED", error)

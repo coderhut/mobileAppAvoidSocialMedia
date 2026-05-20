@@ -1,9 +1,7 @@
 import React from 'react';
-import {PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {PrimaryButton} from '../common/PrimaryButton';
-import {ScreenScaffold} from '../common/ScreenScaffold';
 import {useAppTheme} from '../../theme/ThemeContext';
-import {UsageStatsModule} from '../../native/modules';
 
 export function SetupPermissionsScreen({
   hasUsageAccess,
@@ -16,6 +14,7 @@ export function SetupPermissionsScreen({
   requestNotifications,
   onContinue,
   onOpenSettingsMenu,
+  hideHeader = false,
 }: {
   hasUsageAccess: boolean;
   hasOverlayAccess: boolean;
@@ -26,7 +25,8 @@ export function SetupPermissionsScreen({
   requestMicrophone: () => void;
   requestNotifications: () => void;
   onContinue: () => void;
-  onOpenSettingsMenu: () => void;
+  onOpenSettingsMenu?: () => void;
+  hideHeader?: boolean;
 }) {
   const {colors, styles, t} = useAppTheme();
 
@@ -39,15 +39,15 @@ export function SetupPermissionsScreen({
     onPress: () => void
   ) => {
     return (
-      <View style={[localStyles.itemContainer, {borderColor: colors.border}]}>
+      <View style={[localStyles.itemContainer, {backgroundColor: colors.surface, borderColor: colors.border}]}>
         <View style={localStyles.itemInfo}>
-          <Text style={[styles.appName, {color: colors.text}]}>{label}</Text>
-          <Text style={[styles.body, {fontSize: 12, marginTop: 2}]}>{desc}</Text>
+          <Text style={[localStyles.itemLabel, {color: colors.text}]}>{label}</Text>
+          <Text style={[localStyles.itemDesc, {color: colors.mutedText}]}>{desc}</Text>
         </View>
         <View style={localStyles.itemAction}>
           {isGranted ? (
-            <View style={[localStyles.checkCircle, {backgroundColor: colors.success}]}>
-              <Text style={localStyles.checkMark}>✓</Text>
+            <View style={[localStyles.checkCircle, {backgroundColor: colors.success + '20'}]}>
+              <Text style={[localStyles.checkMark, {color: colors.success}]}>✓</Text>
             </View>
           ) : (
             <Pressable
@@ -63,19 +63,21 @@ export function SetupPermissionsScreen({
 
   return (
     <View style={styles.scrollContent}>
-      <View style={styles.topBar}>
-        <Text style={styles.eyebrow}>{t('stepOne')}</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOpenSettingsMenu}
-          style={styles.themeToggle}>
-          <View style={styles.menuIcon}>
-            <View style={styles.menuBar} />
-            <View style={styles.menuBar} />
-            <View style={styles.menuBar} />
-          </View>
-        </Pressable>
-      </View>
+      {!hideHeader && (
+        <View style={styles.topBar}>
+          <Text style={styles.eyebrow}>{t('stepThree')}</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onOpenSettingsMenu}
+            style={styles.themeToggle}>
+            <View style={styles.menuIcon}>
+              <View style={styles.menuBar} />
+              <View style={styles.menuBar} />
+              <View style={styles.menuBar} />
+            </View>
+          </Pressable>
+        </View>
+      )}
 
       <Text style={styles.title}>{t('setupPermissionsTitle')}</Text>
       <Text style={styles.body}>{t('setupPermissionsBody')}</Text>
@@ -110,10 +112,10 @@ export function SetupPermissionsScreen({
         )}
       </View>
 
-      <View style={{marginTop: 32}}>
+      <View style={localStyles.footer}>
         <PrimaryButton
           disabled={!canContinue}
-          label={canContinue ? t('getStarted') : t('returnAfterEnabling')}
+          label={canContinue ? t('allSetLabel') : t('returnAfterEnabling')}
           onPress={onContinue}
         />
       </View>
@@ -130,38 +132,51 @@ const localStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 20,
     borderWidth: 1,
   },
   itemInfo: {
     flex: 1,
     marginRight: 16,
   },
+  itemLabel: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  itemDesc: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
   itemAction: {
-    minWidth: 80,
+    minWidth: 70,
     alignItems: 'flex-end',
   },
   checkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkMark: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontWeight: '900',
+    fontSize: 18,
   },
   grantButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   grantButtonText: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontWeight: '800',
     fontSize: 14,
   },
+  footer: {
+    marginTop: 48,
+    marginBottom: 20,
+  }
 });

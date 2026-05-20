@@ -11,11 +11,13 @@ export function AppSelectionScreen({
   isLoadingApps,
   onOpenSettings,
   onContinue,
+  hideHeader = false,
 }: {
   availableApps: TrackableApp[];
   isLoadingApps: boolean;
-  onOpenSettings: () => void;
+  onOpenSettings?: () => void;
   onContinue: () => void;
+  hideHeader?: boolean;
 }) {
   const {colors, styles, t} = useAppTheme();
   const {selectedPackageNames, toggleApp} = useSettings();
@@ -95,19 +97,21 @@ export function AppSelectionScreen({
         )}
         ListHeaderComponent={
           <>
-            <View style={styles.topBar}>
-              <Text style={styles.eyebrow}>{t('stepTwo')}</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={onOpenSettings}
-                style={styles.themeToggle}>
-                <View style={styles.menuIcon}>
-                  <View style={styles.menuBar} />
-                  <View style={styles.menuBar} />
-                  <View style={styles.menuBar} />
-                </View>
-              </Pressable>
-            </View>
+            {!hideHeader && (
+              <View style={styles.topBar}>
+                <Text style={styles.eyebrow}>{t('stepTwo')}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={onOpenSettings}
+                  style={styles.themeToggle}>
+                  <View style={styles.menuIcon}>
+                    <View style={styles.menuBar} />
+                    <View style={styles.menuBar} />
+                    <View style={styles.menuBar} />
+                  </View>
+                </Pressable>
+              </View>
+            )}
             <Text style={styles.title}>{t('appSelectionTitle')}</Text>
             <Text style={styles.body}>{t('appSelectionBody')}</Text>
             {isLoadingApps ? (

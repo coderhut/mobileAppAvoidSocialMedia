@@ -1,4 +1,10 @@
-export type Step = 'onboarding' | 'setup_permissions' | 'apps' | 'recordings' | 'dashboard';
+export type Step =
+  | 'language'
+  | 'onboarding'
+  | 'recordings'
+  | 'apps'
+  | 'setup_permissions'
+  | 'dashboard';
 export type ThemeMode = 'light' | 'dark';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type LanguageCode = 'en' | 'ur';
@@ -136,6 +142,7 @@ export type UsageStatsBridge = {
   hasUsageAccess: () => Promise<boolean>;
   getTodayUsageStats: () => Promise<UsageStat[]>;
   hasOverlayPermission: () => Promise<boolean>;
+  hasNotificationPermission: () => Promise<boolean>;
   requestOverlayPermission: () => Promise<void>;
   startWatchdogService: () => Promise<void>;
   stopWatchdogService: () => Promise<void>;
@@ -148,6 +155,7 @@ export type AppPreferences = {
   dailyLimitSettings?: string;
   voiceNotes?: string; // JSON string of Record<string, string[]> (level -> filePaths)
   globalDailyLimit?: number; // In minutes
+  hasCompletedOnboarding?: boolean;
 };
 
 export type AppPreferencesBridge = {
@@ -158,6 +166,7 @@ export type AppPreferencesBridge = {
   setDailyLimitSettings: (settingsJson: string) => Promise<void>;
   setVoiceNotes: (voiceNotesJson: string) => Promise<void>;
   setGlobalDailyLimit: (limitMinutes: number) => Promise<void>;
+  setHasCompletedOnboarding: (completed: boolean) => Promise<void>;
 };
 
 export type ThemeColors = {

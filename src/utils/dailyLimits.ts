@@ -4,7 +4,6 @@ import type {
   TrackableApp,
   TranslationKey,
 } from '../types';
-import {formatDuration} from './duration';
 
 export const DEFAULT_DAILY_LIMIT_SETTING: DailyLimitSetting = {
   mode: 'track',

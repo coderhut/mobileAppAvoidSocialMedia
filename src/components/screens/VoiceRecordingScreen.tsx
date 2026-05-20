@@ -1,10 +1,10 @@
-import React, {useState, useRef, useEffect, useCallback} from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Modal,
   Platform,
+  PermissionsAndroid,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -16,56 +16,109 @@ import AudioRecorderPlayer, {
   AVEncodingOption,
 } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
-import {useAppTheme} from '../../theme/ThemeContext';
-import {useSettings} from '../../contexts/SettingsContext';
-import {PrimaryButton} from '../common/PrimaryButton';
-import {ScreenScaffold} from '../common/ScreenScaffold';
+import { useAppTheme } from '../../theme/ThemeContext';
+import { useSettings } from '../../contexts/SettingsContext';
+import { PrimaryButton } from '../common/PrimaryButton';
+import { ScreenScaffold } from '../common/ScreenScaffold';
+import { WaveformVisualizer } from '../common/WaveformVisualizer';
 
 const MAX_DURATION_SEC = 15;
-const MIN_DURATION_MS = 1000;
 
 export function VoiceRecordingScreen({
   onContinue,
   onOpenSettings,
+  hideHeader = false,
 }: {
   onContinue: () => void;
-  onOpenSettings: () => void;
+  onOpenSettings?: () => void;
+  hideHeader?: boolean;
 }) {
-  const {colors, styles, t} = useAppTheme();
-  const {voiceNotes, saveVoiceNote, deleteVoiceNote} = useSettings();
+  const { colors, t } = useAppTheme();
+  const { voiceNotes, saveVoiceNote, deleteVoiceNote } = useSettings();
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [recordTime, setRecordTime] = useState('00:00');
-  const [activeSlot, setActiveSlot] = useState<{level: number; index: number} | null>(null);
+  const [activeSlot, setActiveSlot] = useState<{
+    level: number;
+    index: number;
+  } | null>(null);
   const isRecordingRef = useRef(false);
+  const isStartingRef = useRef(false);
+  const activeSlotRef = useRef<{ level: number; index: number } | null>(null);
+  const isStoppingRef = useRef(false);
 
   const audioRecorderPlayer = useRef(new AudioRecorderPlayer()).current;
 
-  const onStartRecord = async (level: number, index: number) => {
-    if (Platform.OS === 'android') {
-      // Permission check should be handled at the app level or before this screen
+  useEffect(() => {
+    return () => {
+      audioRecorderPlayer.removeRecordBackListener();
+      audioRecorderPlayer.removePlayBackListener();
+      if (isRecordingRef.current) {
+        audioRecorderPlayer.stopRecorder().catch(() => undefined);
+      }
+      audioRecorderPlayer.stopPlayer().catch(() => undefined);
+    };
+  }, [audioRecorderPlayer]);
+
+  const ensureMicrophonePermission = async () => {
+    if (Platform.OS !== 'android') {
+      return true;
     }
 
-    setActiveSlot({level, index});
-    setIsRecording(true);
-    isRecordingRef.current = true;
+    const permission = PermissionsAndroid.PERMISSIONS.RECORD_AUDIO;
+    const hasPermission = await PermissionsAndroid.check(permission);
 
-    const path = Platform.select({
-      android: `${RNFS.DocumentDirectoryPath}/voice_level${level}_${index}.mp4`,
-      ios: `voice_level${level}_${index}.m4a`,
-    });
+    if (hasPermission) {
+      return true;
+    }
 
-    const audioSet = {
-      AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
-      AudioSourceAndroid: AudioSourceAndroidType.MIC,
-      AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
-      AVNumberOfChannelsKeyIOS: 2,
-      AVFormatIDKeyIOS: AVEncodingOption.aac,
-    };
+    const result = await PermissionsAndroid.request(permission);
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  };
 
+  const onStartRecord = async (level: number, index: number) => {
+    if (isStartingRef.current || isRecordingRef.current) {
+      return;
+    }
+
+    isStartingRef.current = true;
     try {
+      const hasPermission = await ensureMicrophonePermission();
+
+      if (!hasPermission) {
+        Alert.alert(t('appName'), t('microphoneDesc'));
+        return;
+      }
+
+      const slot = { level, index };
+      activeSlotRef.current = slot;
+      setActiveSlot(slot);
+      setIsRecording(true);
+      setIsPaused(false);
+      setRecordTime('00:00');
+
+      const path = Platform.select({
+        android: `${RNFS.DocumentDirectoryPath}/voice_level${level}_${index}.mp4`,
+        ios: `voice_level${level}_${index}.m4a`,
+      });
+
+      const audioSet = {
+        AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+        AudioSourceAndroid: AudioSourceAndroidType.MIC,
+        AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
+        AVNumberOfChannelsKeyIOS: 2,
+        AVFormatIDKeyIOS: AVEncodingOption.aac,
+      };
+
       await audioRecorderPlayer.startRecorder(path, audioSet);
-      audioRecorderPlayer.addRecordBackListener((e) => {
-        setRecordTime(audioRecorderPlayer.mmssss(Math.floor(e.currentPosition)));
+      isRecordingRef.current = true;
+      audioRecorderPlayer.addRecordBackListener(e => {
+        const seconds = Math.floor(e.currentPosition / 1000);
+        const mm = Math.floor(seconds / 60)
+          .toString()
+          .padStart(2, '0');
+        const ss = (seconds % 60).toString().padStart(2, '0');
+        setRecordTime(`${mm}:${ss}`);
 
         if (e.currentPosition >= MAX_DURATION_SEC * 1000) {
           onStopRecord();
@@ -73,22 +126,48 @@ export function VoiceRecordingScreen({
       });
     } catch (err) {
       console.error('Failed to start recorder', err);
+      audioRecorderPlayer.removeRecordBackListener();
       setIsRecording(false);
+      setIsPaused(false);
       isRecordingRef.current = false;
+      activeSlotRef.current = null;
       setActiveSlot(null);
+    } finally {
+      isStartingRef.current = false;
+    }
+  };
+
+  const onPauseRecord = async () => {
+    try {
+      await audioRecorderPlayer.pauseRecorder();
+      setIsPaused(true);
+    } catch (err) {
+      console.error('Failed to pause recorder', err);
+    }
+  };
+
+  const onResumeRecord = async () => {
+    try {
+      await audioRecorderPlayer.resumeRecorder();
+      setIsPaused(false);
+    } catch (err) {
+      console.error('Failed to resume recorder', err);
     }
   };
 
   const onStopRecord = async () => {
-    if (!isRecordingRef.current) return;
+    if (!isRecordingRef.current || isStoppingRef.current) return;
 
+    isStoppingRef.current = true;
     try {
       const result = await audioRecorderPlayer.stopRecorder();
       audioRecorderPlayer.removeRecordBackListener();
       setIsRecording(false);
+      setIsPaused(false);
       isRecordingRef.current = false;
 
-      const slot = activeSlot;
+      const slot = activeSlotRef.current;
+      activeSlotRef.current = null;
       setActiveSlot(null);
       setRecordTime('00:00');
 
@@ -97,14 +176,25 @@ export function VoiceRecordingScreen({
       }
     } catch (err) {
       console.error('Failed to stop recorder', err);
+      setIsRecording(false);
+      setIsPaused(false);
+      isRecordingRef.current = false;
+      activeSlotRef.current = null;
+      setActiveSlot(null);
+      setRecordTime('00:00');
+    } finally {
+      isStoppingRef.current = false;
     }
   };
 
   const onPlayBack = async (path: string) => {
     try {
+      audioRecorderPlayer.removePlayBackListener();
+      await audioRecorderPlayer.stopPlayer().catch(() => undefined);
       await audioRecorderPlayer.startPlayer(path);
-      audioRecorderPlayer.addPlayBackListener((e) => {
-        if (e.currentPosition === e.duration) {
+      audioRecorderPlayer.addPlayBackListener(e => {
+        if (e.duration > 0 && e.currentPosition >= e.duration) {
+          audioRecorderPlayer.removePlayBackListener();
           audioRecorderPlayer.stopPlayer();
         }
       });
@@ -118,7 +208,8 @@ export function VoiceRecordingScreen({
     return Object.keys(notes).length > 0;
   };
 
-  const canContinue = isLevelComplete(1) && isLevelComplete(2) && isLevelComplete(3);
+  const canContinue =
+    isLevelComplete(1) && isLevelComplete(2) && isLevelComplete(3);
 
   const handleContinue = () => {
     if (canContinue) {
@@ -132,37 +223,66 @@ export function VoiceRecordingScreen({
     const notes = voiceNotes[level] || {};
     const path = notes[index];
     const isRecorded = !!path;
-    const isActive = activeSlot?.level === level && activeSlot?.index === index;
-    const isRequired = index === 0;
 
     return (
-      <View key={`${level}-${index}`} style={localStyles.slotContainer}>
-        <View style={localStyles.slotInfo}>
-          <Text style={[styles.appName, {color: isRecorded ? colors.success : colors.text}]}>
-            {isRequired ? t('required') : t('optional')} {index + 1}
+      <View
+        key={`${level}-${index}`}
+        style={[
+          localStyles.slotCard,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <View style={localStyles.slotHeader}>
+          <View
+            style={[
+              localStyles.slotNumber,
+              { backgroundColor: colors.surfaceAlt },
+            ]}
+          >
+            <Text
+              style={[localStyles.slotNumberText, { color: colors.primary }]}
+            >
+              {index + 1}
+            </Text>
+          </View>
+          <Text style={[localStyles.slotLabel, { color: colors.text }]}>
+            {index === 0 ? t('required') : t('optional')}
           </Text>
           {isRecorded && (
-            <Pressable onPress={() => onPlayBack(path)}>
-              <Text style={[styles.linkText, {fontSize: 14}]}>▶ Play</Text>
+            <Pressable
+              onPress={() => deleteVoiceNote(level, index)}
+              style={localStyles.deleteIcon}
+            >
+              <Text style={{ color: '#EF4444', fontWeight: '800' }}>✕</Text>
             </Pressable>
           )}
         </View>
 
         <View style={localStyles.slotActions}>
           {isRecorded ? (
-            <Pressable onPress={() => deleteVoiceNote(level, index)}>
-              <Text style={{color: '#EF4444', fontWeight: '800'}}>Delete</Text>
+            <Pressable
+              onPress={() => onPlayBack(path)}
+              style={[
+                localStyles.playButton,
+                { backgroundColor: colors.primary + '15' },
+              ]}
+            >
+              <Text
+                style={[localStyles.playButtonText, { color: colors.primary }]}
+              >
+                ▶ Play Recording
+              </Text>
             </Pressable>
           ) : (
             <Pressable
-              onPressIn={() => onStartRecord(level, index)}
-              onPressOut={onStopRecord}
+              onPress={() => onStartRecord(level, index)}
               style={[
                 localStyles.recordButton,
-                {backgroundColor: isActive ? '#EF4444' : colors.primary},
-              ]}>
+                { backgroundColor: colors.primary },
+              ]}
+            >
               <Text style={localStyles.recordButtonText}>
-                {isActive ? t('releaseToStop') : t('holdToRecord')}
+                {t('getStarted')} Recording
               </Text>
             </Pressable>
           )}
@@ -173,86 +293,188 @@ export function VoiceRecordingScreen({
 
   return (
     <ScreenScaffold
-      eyebrow={t('stepThree')}
+      eyebrow={hideHeader ? t('stepOne') : ''}
       title={t('recordingsTitle')}
       body={t('recordingsBody')}
-      onOpenSettings={onOpenSettings}>
-
-      <View style={localStyles.levelSection}>
-        <Text style={styles.sectionTitle}>{t('level1Title')}</Text>
-        <Text style={styles.appCategory}>{t('level1Desc')}</Text>
-        <View style={localStyles.slotsList}>
-          {[0, 1, 2].map((i) => renderSlot(1, i))}
-        </View>
-      </View>
-
-      <View style={localStyles.levelSection}>
-        <Text style={styles.sectionTitle}>{t('level2Title')}</Text>
-        <Text style={styles.appCategory}>{t('level2Desc')}</Text>
-        <View style={localStyles.slotsList}>
-          {[0, 1, 2].map((i) => renderSlot(2, i))}
-        </View>
-      </View>
-
-      <View style={localStyles.levelSection}>
-        <Text style={styles.sectionTitle}>{t('level3Title')}</Text>
-        <Text style={styles.appCategory}>{t('level3Desc')}</Text>
-        <View style={localStyles.slotsList}>
-          {[0, 1, 2].map((i) => renderSlot(3, i))}
-        </View>
-      </View>
-
-      {isRecording && (
-        <View style={[localStyles.recordingOverlay, {backgroundColor: colors.surface}]}>
-          <ActivityIndicator color="#EF4444" size="large" />
-          <Text style={[styles.title, {marginTop: 20, color: '#EF4444'}]}>{recordTime}</Text>
-          <Text style={styles.body}>{t('releaseToStop')}</Text>
-        </View>
-      )}
-
-      <PrimaryButton
-        disabled={!canContinue}
-        label={t('finishSetup')}
-        onPress={handleContinue}
+      onOpenSettings={onOpenSettings}
+      hideHeader={hideHeader}
+    >
+      <LevelSection
+        title={t('level1Title')}
+        desc={t('level1Desc')}
+        level={1}
+        renderSlot={renderSlot}
+        colors={colors}
       />
+
+      <LevelSection
+        title={t('level2Title')}
+        desc={t('level2Desc')}
+        level={2}
+        renderSlot={renderSlot}
+        colors={colors}
+      />
+
+      <LevelSection
+        title={t('level3Title')}
+        desc={t('level3Desc')}
+        level={3}
+        renderSlot={renderSlot}
+        colors={colors}
+      />
+
+      <Modal visible={isRecording} transparent={false} animationType="fade">
+        <View
+          style={[
+            localStyles.recordingOverlay,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <Text style={[localStyles.overlayTitle, { color: colors.text }]}>
+            Recording Slot {(activeSlot?.index ?? 0) + 1}
+          </Text>
+
+          <WaveformVisualizer isRecording={!isPaused} colors={colors} />
+
+          <Text style={[localStyles.recordTimer, { color: colors.text }]}>
+            {recordTime}
+          </Text>
+
+          <View style={localStyles.controlGroup}>
+            {isPaused ? (
+              <Pressable
+                onPress={onResumeRecord}
+                style={[
+                  localStyles.controlBtn,
+                  { backgroundColor: colors.success },
+                ]}
+              >
+                <Text style={localStyles.controlBtnText}>Resume</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={onPauseRecord}
+                style={[
+                  localStyles.controlBtn,
+                  { backgroundColor: colors.surfaceAlt },
+                ]}
+              >
+                <Text
+                  style={[localStyles.controlBtnText, { color: colors.text }]}
+                >
+                  Pause
+                </Text>
+              </Pressable>
+            )}
+
+            <Pressable
+              onPress={onStopRecord}
+              style={[localStyles.controlBtn, { backgroundColor: '#EF4444' }]}
+            >
+              <Text style={localStyles.controlBtnText}>Stop & Save</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <View style={{ marginTop: 20 }}>
+        <PrimaryButton
+          disabled={!canContinue}
+          label={t('continueWith')}
+          onPress={handleContinue}
+        />
+      </View>
     </ScreenScaffold>
+  );
+}
+
+function LevelSection({ title, desc, level, renderSlot, colors }: any) {
+  return (
+    <View style={localStyles.levelSection}>
+      <Text style={[localStyles.sectionTitle, { color: colors.text }]}>
+        {title}
+      </Text>
+      <Text style={[localStyles.sectionDesc, { color: colors.mutedText }]}>
+        {desc}
+      </Text>
+      <View style={localStyles.slotsList}>
+        {[0, 1, 2].map(i => renderSlot(level, i))}
+      </View>
+    </View>
   );
 }
 
 const localStyles = StyleSheet.create({
   levelSection: {
-    marginBottom: 32,
+    marginBottom: 40,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  sectionDesc: {
+    fontSize: 14,
+    marginBottom: 20,
+    lineHeight: 20,
   },
   slotsList: {
-    marginTop: 16,
     gap: 12,
   },
-  slotContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 8,
+  slotCard: {
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
-  slotInfo: {
-    flex: 1,
+  slotHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    marginBottom: 16,
+  },
+  slotNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  slotNumberText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  slotLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  deleteIcon: {
+    padding: 8,
   },
   slotActions: {
-    marginLeft: 16,
+    width: '100%',
   },
   recordButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   recordButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  playButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  playButtonText: {
+    fontSize: 15,
     fontWeight: '800',
   },
   recordingOverlay: {
@@ -261,9 +483,39 @@ const localStyles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 100,
+    zIndex: 2000,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    padding: 24,
+    height: '100%',
+    width: '100%',
+  },
+  overlayTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  recordTimer: {
+    fontSize: 56,
+    fontWeight: '900',
+    marginBottom: 40,
+    fontVariant: ['tabular-nums'],
+  },
+  controlGroup: {
+    flexDirection: 'row',
+    gap: 16,
+    width: '100%',
+  },
+  controlBtn: {
+    flex: 1,
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });

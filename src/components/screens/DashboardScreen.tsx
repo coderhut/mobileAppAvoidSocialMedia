@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {Image, Pressable, Text, View} from 'react-native';
+import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import {ScreenScaffold} from '../common/ScreenScaffold';
 import {useAppTheme} from '../../theme/ThemeContext';
 import {useSettings} from '../../contexts/SettingsContext';
@@ -33,7 +33,7 @@ export function DashboardScreen({
   onOpenSettings: () => void;
   onRefresh: () => void;
 }) {
-  const {styles, t} = useAppTheme();
+  const {colors, styles, t} = useAppTheme();
   const {
     selectedPackageNames,
     globalDailyLimit,
@@ -47,6 +47,7 @@ export function DashboardScreen({
     () => new Set(availableApps.map(app => app.packageName)),
     [availableApps],
   );
+
   const dashboardItems = useMemo(() => {
     return selectedPackageNames
       .map(packageName => {
@@ -66,11 +67,9 @@ export function DashboardScreen({
         if (first.isInstalled !== second.isInstalled) {
           return first.isInstalled ? -1 : 1;
         }
-
         return second.usageMs - first.usageMs;
       });
   }, [availableApps, installedPackageNames, selectedPackageNames, usageByPackage]);
-  const hasMissingApps = dashboardItems.some(item => !item.isInstalled);
 
   return (
     <ScreenScaffold
@@ -78,16 +77,17 @@ export function DashboardScreen({
       title={t('dashboardTitle')}
       body={t('dashboardBody')}
       onOpenSettings={onOpenSettings}>
-      <View style={styles.metricPanel}>
-        <Text style={styles.metricNumber}>{formatDuration(totalTrackedMs)}</Text>
-        <Text style={styles.metricLabel}>{t('trackedToday')}</Text>
+
+      <View style={[styles.metricPanel, {backgroundColor: colors.metricBackground}]}>
+        <Text style={[styles.metricNumber, {color: colors.metricText}]}>{formatDuration(totalTrackedMs)}</Text>
+        <Text style={[styles.metricLabel, {color: colors.metricLabel}]}>{t('trackedToday')}</Text>
       </View>
 
-      <View style={styles.usageCard}>
+      <View style={[styles.usageCard, localStyles.limitCard]}>
         <View style={styles.limitTextGroup}>
           <Text style={styles.limitTitle}>Collective Daily Limit</Text>
           <Text style={styles.limitSubtitle}>
-            Voice notes will play after {globalDailyLimit} minutes of total distracting app usage.
+            Voice notes play after {globalDailyLimit}m of total usage.
           </Text>
         </View>
         <View style={styles.limitStepper}>
@@ -99,8 +99,7 @@ export function DashboardScreen({
             <Text style={styles.limitStepText}>-</Text>
           </Pressable>
           <Text style={styles.limitValue}>
-            {globalDailyLimit}
-            {t('minutesShort')}
+            {globalDailyLimit}m
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -111,31 +110,6 @@ export function DashboardScreen({
           </Pressable>
         </View>
       </View>
-
-      {!hasUsageAccess || usageError ? (
-        <View style={styles.noticeBox}>
-          <Text style={styles.noticeTitle}>
-            {hasUsageAccess ? t('usageStatsUnavailable') : t('usageAccessNeeded')}
-          </Text>
-          <Text style={styles.noticeText}>
-            {usageError ?? t('enableUsageAccessBody')}
-          </Text>
-        </View>
-      ) : null}
-
-      {selectedPackageNames.length === 0 ? (
-        <View style={styles.noticeBox}>
-          <Text style={styles.noticeTitle}>{t('trackedApps')}</Text>
-          <Text style={styles.noticeText}>{t('dashboardEmpty')}</Text>
-        </View>
-      ) : null}
-
-      {hasMissingApps ? (
-        <View style={styles.noticeBox}>
-          <Text style={styles.noticeTitle}>{t('notInstalled')}</Text>
-          <Text style={styles.noticeText}>{t('selectedAppsMissing')}</Text>
-        </View>
-      ) : null}
 
       <View style={styles.dashboardHeader}>
         <Text style={styles.sectionTitle}>{t('trackedApps')}</Text>
@@ -150,40 +124,57 @@ export function DashboardScreen({
       </View>
 
       <View style={styles.appList}>
-        {dashboardItems.map(item => {
-          return (
-            <View key={item.packageName} style={styles.usageCard}>
-              <View style={styles.usageRowTop}>
-                <View
-                  style={[
-                    styles.appIconSmall,
-                    {backgroundColor: item.app?.accent ?? '#64748B'},
-                  ]}>
-                  {item.app?.icon ? (
-                    <Image
-                      source={{uri: `data:image/png;base64,${item.app.icon}`}}
-                      style={{width: '100%', height: '100%', borderRadius: 8}}
-                    />
-                  ) : (
-                    <Text style={styles.appIconTextSmall}>
-                      {(item.app?.name ?? '?').charAt(0)}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.usageTextGroup}>
-                  <Text style={styles.usageName}>
-                    {item.app?.name ?? item.packageName}
+        {dashboardItems.map(item => (
+          <View key={item.packageName} style={styles.usageCard}>
+            <View style={styles.usageRowTop}>
+              <View
+                style={[
+                  styles.appIconSmall,
+                  {backgroundColor: item.app?.accent ?? colors.surfaceAlt},
+                ]}>
+                {item.app?.icon ? (
+                  <Image
+                    source={{uri: `data:image/png;base64,${item.app.icon}`}}
+                    style={{width: '100%', height: '100%', borderRadius: 10}}
+                  />
+                ) : (
+                  <Text style={styles.appIconTextSmall}>
+                    {(item.app?.name ?? '?').charAt(0)}
                   </Text>
-                  <Text style={styles.usageStatus}>
-                    {getUsageStatusText(item, t)}
-                  </Text>
-                </View>
-                <Text style={styles.usageTime}>{formatDuration(item.usageMs)}</Text>
+                )}
               </View>
+              <View style={styles.usageTextGroup}>
+                <Text style={styles.usageName}>
+                  {item.app?.name ?? item.packageName}
+                </Text>
+                <Text style={styles.usageStatus}>
+                  {getUsageStatusText(item, t)}
+                </Text>
+              </View>
+              <Text style={styles.usageTime}>{formatDuration(item.usageMs)}</Text>
             </View>
-          );
-        })}
+          </View>
+        ))}
       </View>
+
+      {!hasUsageAccess || usageError ? (
+        <View style={styles.noticeBox}>
+          <Text style={styles.noticeTitle}>
+            {hasUsageAccess ? t('usageStatsUnavailable') : t('usageAccessNeeded')}
+          </Text>
+          <Text style={styles.noticeText}>
+            {usageError ?? t('enableUsageAccessBody')}
+          </Text>
+        </View>
+      ) : null}
+
     </ScreenScaffold>
   );
 }
+
+const localStyles = StyleSheet.create({
+    limitCard: {
+        marginBottom: 32,
+        padding: 20,
+    }
+});
