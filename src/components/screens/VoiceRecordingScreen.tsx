@@ -20,6 +20,7 @@ import RNFS from 'react-native-fs';
 import { useAppTheme } from '../../theme/ThemeContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { PrimaryButton } from '../common/PrimaryButton';
+import { SecondaryButton } from '../common/SecondaryButton';
 import { ScreenScaffold } from '../common/ScreenScaffold';
 import { WaveformVisualizer } from '../common/WaveformVisualizer';
 
@@ -27,10 +28,12 @@ const MAX_DURATION_SEC = 15;
 
 export function VoiceRecordingScreen({
   onContinue,
+  onBack,
   onOpenSettings,
   hideHeader = false,
 }: {
   onContinue: () => void;
+  onBack: () => void;
   onOpenSettings?: () => void;
   hideHeader?: boolean;
 }) {
@@ -472,12 +475,19 @@ export function VoiceRecordingScreen({
         </View>
       </Modal>
 
-      <View style={{ marginTop: 20 }}>
-        <PrimaryButton
-          disabled={!canContinue}
-          label={t('continueWith')}
-          onPress={handleContinue}
-        />
+      <View style={{ marginTop: 20, marginBottom: 20 }}>
+        <View style={localStyles.buttonRow}>
+          <View style={localStyles.buttonCell}>
+            <SecondaryButton label="Go Back" onPress={onBack} />
+          </View>
+          <View style={localStyles.buttonCell}>
+            <PrimaryButton
+              disabled={!canContinue}
+              label="Continue"
+              onPress={handleContinue}
+            />
+          </View>
+        </View>
       </View>
     </ScreenScaffold>
   );
@@ -589,6 +599,13 @@ const localStyles = StyleSheet.create({
   playButtonText: {
     fontSize: 15,
     fontWeight: '800',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  buttonCell: {
+    flex: 1,
   },
   recordingOverlay: {
     position: 'absolute',

@@ -93,7 +93,7 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     optional: 'Optional',
     minRecordingsAlert: 'Please record at least one note for each level to proceed.',
     finishSetup: 'Finish setup',
-    setupPermissionsTitle: 'System Setup',
+    setupPermissionsTitle: 'Permissions Setup',
     setupPermissionsBody: 'The following permissions are required for the app to function properly.',
     usageAccessLabel: 'Usage Access',
     usageAccessDesc: 'To track screen time in distracting apps.',

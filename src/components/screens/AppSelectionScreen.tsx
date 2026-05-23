@@ -1,6 +1,7 @@
 import React from 'react';
 import {Image, Pressable, SectionList, StyleSheet, Text, View} from 'react-native';
 import {PrimaryButton} from '../common/PrimaryButton';
+import {SecondaryButton} from '../common/SecondaryButton';
 import {useAppTheme} from '../../theme/ThemeContext';
 import {useSettings} from '../../contexts/SettingsContext';
 import type {TrackableApp} from '../../types';
@@ -10,12 +11,14 @@ export function AppSelectionScreen({
   availableApps,
   isLoadingApps,
   onOpenSettings,
+  onBack,
   onContinue,
   hideHeader = false,
 }: {
   availableApps: TrackableApp[];
   isLoadingApps: boolean;
   onOpenSettings?: () => void;
+  onBack: () => void;
   onContinue: () => void;
   hideHeader?: boolean;
 }) {
@@ -123,13 +126,18 @@ export function AppSelectionScreen({
         showsVerticalScrollIndicator={false}
       />
       <View style={[localStyles.fixedFooter, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
-        <PrimaryButton
-          disabled={selectedPackageNames.length === 0}
-          label={`${t('continueWith')} ${selectedPackageNames.length} ${
-            selectedPackageNames.length === 1 ? t('appSingular') : t('appPlural')
-          }`}
-          onPress={onContinue}
-        />
+        <View style={localStyles.buttonRow}>
+          <View style={localStyles.buttonCell}>
+            <SecondaryButton label="Go Back" onPress={onBack} />
+          </View>
+          <View style={localStyles.buttonCell}>
+            <PrimaryButton
+              disabled={selectedPackageNames.length === 0}
+              label="Continue"
+              onPress={onContinue}
+            />
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -151,8 +159,16 @@ const localStyles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 24,
     paddingVertical: 16,
+    paddingBottom: 36,
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  buttonCell: {
+    flex: 1,
   },
 });
 

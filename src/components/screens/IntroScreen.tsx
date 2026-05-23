@@ -1,15 +1,18 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '../common/PrimaryButton';
+import { SecondaryButton } from '../common/SecondaryButton';
 import { ScreenScaffold } from '../common/ScreenScaffold';
 import { useAppTheme } from '../../theme/ThemeContext';
 
 export function IntroScreen({
   onContinue,
+  onBack,
   onOpenSettings,
   hideHeader = false,
 }: {
   onContinue: () => void;
+  onBack: () => void;
   onOpenSettings?: () => void;
   hideHeader?: boolean;
 }) {
@@ -45,7 +48,14 @@ export function IntroScreen({
       </View>
 
       <View style={styles.actionGroup}>
-        <PrimaryButton label={t('getStarted')} onPress={onContinue} />
+        <View style={[localStyles.buttonRow, localStyles.bottomNav]}>
+          <View style={localStyles.buttonCell}>
+            <SecondaryButton label="Go Back" onPress={onBack} />
+          </View>
+          <View style={localStyles.buttonCell}>
+            <PrimaryButton label={t('getStarted')} onPress={onContinue} />
+          </View>
+        </View>
       </View>
     </ScreenScaffold>
   );
@@ -130,5 +140,15 @@ const localStyles = StyleSheet.create({
   itemDesc: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  bottomNav: {
+    paddingBottom: 20,
+  },
+  buttonCell: {
+    flex: 1,
   },
 });

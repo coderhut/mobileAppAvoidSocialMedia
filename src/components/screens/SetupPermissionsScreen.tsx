@@ -1,6 +1,7 @@
 import React from 'react';
 import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
 import {PrimaryButton} from '../common/PrimaryButton';
+import {SecondaryButton} from '../common/SecondaryButton';
 import {useAppTheme} from '../../theme/ThemeContext';
 
 type PermissionKey = 'usage' | 'overlay' | 'microphone' | 'notification';
@@ -14,6 +15,7 @@ export function SetupPermissionsScreen({
   onOpenOverlaySettings,
   requestMicrophone,
   requestNotifications,
+  onBack,
   onContinue,
   onOpenSettingsMenu,
   hideHeader = false,
@@ -26,6 +28,7 @@ export function SetupPermissionsScreen({
   onOpenOverlaySettings: () => void | Promise<void>;
   requestMicrophone: () => void | Promise<void>;
   requestNotifications: () => void | Promise<void>;
+  onBack: () => void;
   onContinue: () => void;
   onOpenSettingsMenu?: () => void;
   hideHeader?: boolean;
@@ -34,7 +37,11 @@ export function SetupPermissionsScreen({
   const [pendingPermission, setPendingPermission] =
     React.useState<PermissionKey | null>(null);
 
-  const canContinue = hasUsageAccess && hasOverlayAccess;
+  const canContinue =
+    hasUsageAccess &&
+    hasOverlayAccess &&
+    hasMicrophoneAccess &&
+    hasNotificationAccess;
 
   const handleGrant = async (
     permission: PermissionKey,
@@ -150,11 +157,18 @@ export function SetupPermissionsScreen({
       </View>
 
       <View style={localStyles.footer}>
-        <PrimaryButton
-          disabled={!canContinue}
-          label={canContinue ? t('allSetLabel') : t('returnAfterEnabling')}
-          onPress={onContinue}
-        />
+        <View style={localStyles.buttonRow}>
+          <View style={localStyles.buttonCell}>
+            <SecondaryButton label="Go Back" onPress={onBack} />
+          </View>
+          <View style={localStyles.buttonCell}>
+            <PrimaryButton
+              disabled={!canContinue}
+              label={canContinue ? t('allSetLabel') : 'Continue'}
+              onPress={onContinue}
+            />
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -221,6 +235,14 @@ const localStyles = StyleSheet.create({
   },
   footer: {
     marginTop: 48,
-    marginBottom: 20,
+    marginBottom: 60,
+    paddingBottom: 40,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  buttonCell: {
+    flex: 1,
   }
 });

@@ -120,6 +120,12 @@ function AppContent() {
     }, 0);
   }, [selectedPackageNames, usageByPackage]);
 
+  const hasAllOnboardingPermissions =
+    hasUsageAccess &&
+    hasOverlayAccess &&
+    hasNotificationAccess &&
+    hasMicrophoneAccess;
+
   async function openUsageAccessSettings() {
     if (Platform.OS !== 'android') {
       Alert.alert(t('androidOnlyTitle'), t('androidOnlyBody'));
@@ -322,6 +328,7 @@ function AppContent() {
       return (
         <IntroScreen
           onContinue={() => setStep('setup_permissions')}
+          onBack={() => setStep('language')}
           onOpenSettings={() => setIsSettingsOpen(true)}
           hideHeader={!hasCompletedOnboarding}
         />
@@ -332,6 +339,9 @@ function AppContent() {
       return (
         <VoiceRecordingScreen
           onContinue={() => setStep('apps')}
+          onBack={() =>
+            setStep(hasCompletedOnboarding ? 'dashboard' : 'setup_permissions')
+          }
           onOpenSettings={() => setIsSettingsOpen(true)}
           hideHeader={!hasCompletedOnboarding}
         />
@@ -344,6 +354,9 @@ function AppContent() {
           availableApps={availableApps}
           isLoadingApps={isLoadingApps}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onBack={() =>
+            setStep(hasCompletedOnboarding ? 'dashboard' : 'recordings')
+          }
           onContinue={() => {
             setHasCompletedOnboarding(true);
             setStep('dashboard');
@@ -365,7 +378,11 @@ function AppContent() {
           requestMicrophone={requestMicrophoneAccess}
           requestNotifications={requestNotificationAccess}
           onOpenSettingsMenu={() => setIsSettingsOpen(true)}
+          onBack={() => setStep('onboarding')}
           onContinue={() => {
+            if (!hasAllOnboardingPermissions) {
+              return;
+            }
             setStep('recordings');
           }}
           hideHeader={!hasCompletedOnboarding}
