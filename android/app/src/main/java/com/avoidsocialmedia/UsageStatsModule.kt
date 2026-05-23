@@ -111,15 +111,33 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
+  fun requestUsageAccessPermission(promise: Promise) {
+    try {
+      val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+        putExtra(Settings.EXTRA_APP_PACKAGE, reactContext.packageName)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+
+      startSettingsActivity(intent, Settings.ACTION_USAGE_ACCESS_SETTINGS)
+      promise.resolve(null)
+    } catch (error: Exception) {
+      promise.reject("USAGE_ACCESS_REQUEST_FAILED", error)
+    }
+  }
+
+  @ReactMethod
   fun requestOverlayPermission(promise: Promise) {
     try {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         val intent = Intent(
           Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
           Uri.parse("package:${reactContext.packageName}")
-        )
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        reactContext.startActivity(intent)
+        ).apply {
+          putExtra(Settings.EXTRA_APP_PACKAGE, reactContext.packageName)
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        startSettingsActivity(intent, Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
       }
       promise.resolve(null)
     } catch (error: Exception) {
@@ -210,6 +228,19 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
     )
 
     return mode == AppOpsManager.MODE_ALLOWED
+  }
+
+  private fun startSettingsActivity(intent: Intent, fallbackAction: String) {
+    val packageManager = reactContext.packageManager
+    val resolvedIntent = if (intent.resolveActivity(packageManager) != null) {
+      intent
+    } else {
+      Intent(fallbackAction).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+    }
+
+    reactContext.startActivity(resolvedIntent)
   }
 
   private fun getAppName(packageManager: PackageManager, packageName: String): String {

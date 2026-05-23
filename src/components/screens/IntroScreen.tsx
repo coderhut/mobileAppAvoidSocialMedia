@@ -26,20 +26,20 @@ export function IntroScreen({
       <View style={localStyles.roadmap}>
         <RoadmapItem
           number={1}
+          title="Grant System Permissions"
+          desc="Enable the system access needed to protect your attention."
+          colors={colors}
+        />
+        <RoadmapItem
+          number={2}
           title="Record Interventions"
           desc="Create voice notes to pull you out of the scroll."
           colors={colors}
         />
         <RoadmapItem
-          number={2}
+          number={3}
           title="Target Distractions"
           desc="Select the apps where you lose the most time."
-          colors={colors}
-        />
-        <RoadmapItem
-          number={3}
-          title="Activate Guard"
-          desc="Enable system links to protect your attention."
           colors={colors}
         />
       </View>

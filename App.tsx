@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   AppState,
-  Linking,
   PermissionsAndroid,
   Platform,
   StatusBar,
@@ -128,9 +127,9 @@ function AppContent() {
     }
 
     try {
-      await Linking.sendIntent('android.settings.USAGE_ACCESS_SETTINGS');
+      await UsageStatsModule?.requestUsageAccessPermission();
     } catch {
-      await Linking.openSettings();
+      Alert.alert(t('appName'), t('unableToCheckAccess'));
     }
   }
 
@@ -322,7 +321,7 @@ function AppContent() {
     if (step === 'onboarding') {
       return (
         <IntroScreen
-          onContinue={() => setStep('recordings')}
+          onContinue={() => setStep('setup_permissions')}
           onOpenSettings={() => setIsSettingsOpen(true)}
           hideHeader={!hasCompletedOnboarding}
         />
@@ -345,7 +344,10 @@ function AppContent() {
           availableApps={availableApps}
           isLoadingApps={isLoadingApps}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onContinue={() => setStep('setup_permissions')}
+          onContinue={() => {
+            setHasCompletedOnboarding(true);
+            setStep('dashboard');
+          }}
           hideHeader={!hasCompletedOnboarding}
         />
       );
@@ -364,8 +366,7 @@ function AppContent() {
           requestNotifications={requestNotificationAccess}
           onOpenSettingsMenu={() => setIsSettingsOpen(true)}
           onContinue={() => {
-            setHasCompletedOnboarding(true);
-            setStep('dashboard');
+            setStep('recordings');
           }}
           hideHeader={!hasCompletedOnboarding}
         />

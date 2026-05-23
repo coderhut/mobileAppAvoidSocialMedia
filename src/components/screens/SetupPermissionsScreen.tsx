@@ -1,7 +1,9 @@
 import React from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
 import {PrimaryButton} from '../common/PrimaryButton';
 import {useAppTheme} from '../../theme/ThemeContext';
+
+type PermissionKey = 'usage' | 'overlay' | 'microphone' | 'notification';
 
 export function SetupPermissionsScreen({
   hasUsageAccess,
@@ -20,24 +22,46 @@ export function SetupPermissionsScreen({
   hasOverlayAccess: boolean;
   hasNotificationAccess: boolean;
   hasMicrophoneAccess: boolean;
-  onOpenUsageSettings: () => void;
-  onOpenOverlaySettings: () => void;
-  requestMicrophone: () => void;
-  requestNotifications: () => void;
+  onOpenUsageSettings: () => void | Promise<void>;
+  onOpenOverlaySettings: () => void | Promise<void>;
+  requestMicrophone: () => void | Promise<void>;
+  requestNotifications: () => void | Promise<void>;
   onContinue: () => void;
   onOpenSettingsMenu?: () => void;
   hideHeader?: boolean;
 }) {
   const {colors, styles, t} = useAppTheme();
+  const [pendingPermission, setPendingPermission] =
+    React.useState<PermissionKey | null>(null);
 
   const canContinue = hasUsageAccess && hasOverlayAccess;
 
+  const handleGrant = async (
+    permission: PermissionKey,
+    onPress: () => void | Promise<void>,
+  ) => {
+    if (pendingPermission) return;
+
+    setPendingPermission(permission);
+    try {
+      await Promise.all([
+        onPress(),
+        new Promise<void>(resolve => setTimeout(() => resolve(), 900)),
+      ]);
+    } finally {
+      setPendingPermission(null);
+    }
+  };
+
   const renderPermissionItem = (
+    permission: PermissionKey,
     label: string,
     desc: string,
     isGranted: boolean,
-    onPress: () => void
+    onPress: () => void | Promise<void>
   ) => {
+    const isPending = pendingPermission === permission;
+
     return (
       <View style={[localStyles.itemContainer, {backgroundColor: colors.surface, borderColor: colors.border}]}>
         <View style={localStyles.itemInfo}>
@@ -51,9 +75,18 @@ export function SetupPermissionsScreen({
             </View>
           ) : (
             <Pressable
-              onPress={onPress}
-              style={[localStyles.grantButton, {backgroundColor: colors.primary}]}>
-              <Text style={localStyles.grantButtonText}>{t('grantLabel')}</Text>
+              disabled={!!pendingPermission}
+              onPress={() => handleGrant(permission, onPress)}
+              style={[
+                localStyles.grantButton,
+                {backgroundColor: colors.primary},
+                !!pendingPermission && !isPending && localStyles.disabledButton,
+              ]}>
+              {isPending ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={localStyles.grantButtonText}>{t('grantLabel')}</Text>
+              )}
             </Pressable>
           )}
         </View>
@@ -65,7 +98,7 @@ export function SetupPermissionsScreen({
     <View style={styles.scrollContent}>
       {!hideHeader && (
         <View style={styles.topBar}>
-          <Text style={styles.eyebrow}>{t('stepThree')}</Text>
+          <Text style={styles.eyebrow}>{t('stepOne')}</Text>
           <Pressable
             accessibilityRole="button"
             onPress={onOpenSettingsMenu}
@@ -84,6 +117,7 @@ export function SetupPermissionsScreen({
 
       <View style={localStyles.list}>
         {renderPermissionItem(
+          'usage',
           t('usageAccessLabel'),
           t('usageAccessDesc'),
           hasUsageAccess,
@@ -91,6 +125,7 @@ export function SetupPermissionsScreen({
         )}
 
         {renderPermissionItem(
+          'overlay',
           t('overlayLabel'),
           t('overlayDesc'),
           hasOverlayAccess,
@@ -98,6 +133,7 @@ export function SetupPermissionsScreen({
         )}
 
         {renderPermissionItem(
+          'microphone',
           t('microphoneLabel'),
           t('microphoneDesc'),
           hasMicrophoneAccess,
@@ -105,6 +141,7 @@ export function SetupPermissionsScreen({
         )}
 
         {renderPermissionItem(
+          'notification',
           t('notificationLabel'),
           t('notificationDesc'),
           hasNotificationAccess,
@@ -166,9 +203,16 @@ const localStyles = StyleSheet.create({
     fontSize: 18,
   },
   grantButton: {
+    minWidth: 70,
+    minHeight: 38,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabledButton: {
+    opacity: 0.45,
   },
   grantButtonText: {
     color: '#FFFFFF',

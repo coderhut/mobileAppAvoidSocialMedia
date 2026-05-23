@@ -99,7 +99,7 @@ export function AppSelectionScreen({
           <>
             {!hideHeader && (
               <View style={styles.topBar}>
-                <Text style={styles.eyebrow}>{t('stepTwo')}</Text>
+                <Text style={styles.eyebrow}>{t('stepThree')}</Text>
                 <Pressable
                   accessibilityRole="button"
                   onPress={onOpenSettings}

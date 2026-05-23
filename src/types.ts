@@ -143,6 +143,7 @@ export type UsageStatsBridge = {
   getTodayUsageStats: () => Promise<UsageStat[]>;
   hasOverlayPermission: () => Promise<boolean>;
   hasNotificationPermission: () => Promise<boolean>;
+  requestUsageAccessPermission: () => Promise<void>;
   requestOverlayPermission: () => Promise<void>;
   startWatchdogService: () => Promise<void>;
   stopWatchdogService: () => Promise<void>;

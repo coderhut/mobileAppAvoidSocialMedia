@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Modal,
   Platform,
   PermissionsAndroid,
@@ -42,6 +43,15 @@ export function VoiceRecordingScreen({
     level: number;
     index: number;
   } | null>(null);
+  const [startingSlot, setStartingSlot] = useState<{
+    level: number;
+    index: number;
+  } | null>(null);
+  const [playingSlot, setPlayingSlot] = useState<{
+    level: number;
+    index: number;
+  } | null>(null);
+  const [isPlaybackPaused, setIsPlaybackPaused] = useState(false);
   const isRecordingRef = useRef(false);
   const isStartingRef = useRef(false);
   const activeSlotRef = useRef<{ level: number; index: number } | null>(null);
@@ -82,6 +92,7 @@ export function VoiceRecordingScreen({
     }
 
     isStartingRef.current = true;
+    setStartingSlot({ level, index });
     try {
       const hasPermission = await ensureMicrophonePermission();
 
@@ -134,6 +145,7 @@ export function VoiceRecordingScreen({
       setActiveSlot(null);
     } finally {
       isStartingRef.current = false;
+      setStartingSlot(null);
     }
   };
 
@@ -187,19 +199,55 @@ export function VoiceRecordingScreen({
     }
   };
 
-  const onPlayBack = async (path: string) => {
+  const onPlayBack = async (path: string, level: number, index: number) => {
     try {
       audioRecorderPlayer.removePlayBackListener();
       await audioRecorderPlayer.stopPlayer().catch(() => undefined);
       await audioRecorderPlayer.startPlayer(path);
+      setPlayingSlot({ level, index });
+      setIsPlaybackPaused(false);
       audioRecorderPlayer.addPlayBackListener(e => {
         if (e.duration > 0 && e.currentPosition >= e.duration) {
           audioRecorderPlayer.removePlayBackListener();
           audioRecorderPlayer.stopPlayer();
+          setPlayingSlot(null);
+          setIsPlaybackPaused(false);
         }
       });
     } catch (err) {
+      setPlayingSlot(null);
+      setIsPlaybackPaused(false);
       console.error('Failed to play', err);
+    }
+  };
+
+  const onPauseBack = async () => {
+    try {
+      await audioRecorderPlayer.pausePlayer();
+    } catch (err) {
+      console.error('Failed to pause playback', err);
+    }
+    setIsPlaybackPaused(true);
+  };
+
+  const onResumeBack = async () => {
+    try {
+      await audioRecorderPlayer.resumePlayer();
+      setIsPlaybackPaused(false);
+    } catch (err) {
+      console.error('Failed to resume playback', err);
+    }
+  };
+
+  const onStopBack = async () => {
+    try {
+      audioRecorderPlayer.removePlayBackListener();
+      await audioRecorderPlayer.stopPlayer();
+    } catch (err) {
+      console.error('Failed to stop playback', err);
+    } finally {
+      setPlayingSlot(null);
+      setIsPlaybackPaused(false);
     }
   };
 
@@ -223,6 +271,10 @@ export function VoiceRecordingScreen({
     const notes = voiceNotes[level] || {};
     const path = notes[index];
     const isRecorded = !!path;
+    const isStarting =
+      startingSlot?.level === level && startingSlot?.index === index;
+    const isPlaying =
+      playingSlot?.level === level && playingSlot?.index === index;
 
     return (
       <View
@@ -260,30 +312,73 @@ export function VoiceRecordingScreen({
 
         <View style={localStyles.slotActions}>
           {isRecorded ? (
-            <Pressable
-              onPress={() => onPlayBack(path)}
-              style={[
-                localStyles.playButton,
-                { backgroundColor: colors.primary + '15' },
-              ]}
-            >
-              <Text
-                style={[localStyles.playButtonText, { color: colors.primary }]}
+            isPlaying ? (
+              <View style={localStyles.playbackControls}>
+                <Pressable
+                  onPress={isPlaybackPaused ? onResumeBack : onPauseBack}
+                  style={[
+                    localStyles.playbackButton,
+                    { backgroundColor: colors.primary + '15' },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      localStyles.playButtonText,
+                      { color: colors.primary },
+                    ]}
+                  >
+                    {isPlaybackPaused ? 'Resume' : 'Pause'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={onStopBack}
+                  style={[
+                    localStyles.playbackButton,
+                    { backgroundColor: '#EF444415' },
+                  ]}
+                >
+                  <Text
+                    style={[localStyles.playButtonText, { color: '#EF4444' }]}
+                  >
+                    Stop
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => onPlayBack(path, level, index)}
+                style={[
+                  localStyles.playButton,
+                  { backgroundColor: colors.primary + '15' },
+                ]}
               >
-                ▶ Play Recording
-              </Text>
-            </Pressable>
+                <Text
+                  style={[
+                    localStyles.playButtonText,
+                    { color: colors.primary },
+                  ]}
+                >
+                  Play Recording
+                </Text>
+              </Pressable>
+            )
           ) : (
             <Pressable
+              disabled={!!startingSlot}
               onPress={() => onStartRecord(level, index)}
               style={[
                 localStyles.recordButton,
                 { backgroundColor: colors.primary },
+                !!startingSlot && !isStarting && localStyles.disabledButton,
               ]}
             >
-              <Text style={localStyles.recordButtonText}>
-                {t('getStarted')} Recording
-              </Text>
+              {isStarting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={localStyles.recordButtonText}>
+                  {t('getStarted')} Recording
+                </Text>
+              )}
             </Pressable>
           )}
         </View>
@@ -293,7 +388,7 @@ export function VoiceRecordingScreen({
 
   return (
     <ScreenScaffold
-      eyebrow={hideHeader ? t('stepOne') : ''}
+      eyebrow={hideHeader ? t('stepTwo') : ''}
       title={t('recordingsTitle')}
       body={t('recordingsBody')}
       onOpenSettings={onOpenSettings}
@@ -457,9 +552,14 @@ const localStyles = StyleSheet.create({
     width: '100%',
   },
   recordButton: {
+    minHeight: 46,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabledButton: {
+    opacity: 0.45,
   },
   recordButtonText: {
     color: '#FFFFFF',
@@ -467,6 +567,19 @@ const localStyles = StyleSheet.create({
     fontWeight: '800',
   },
   playButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  playbackControls: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  playbackButton: {
+    flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
