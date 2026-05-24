@@ -32,6 +32,7 @@ type SettingsContextType = {
   setThemePreference: (preference: ThemePreference) => void;
   language: LanguageCode;
   setLanguage: (language: LanguageCode) => void;
+  isLoadingPreferences: boolean;
   hasCompletedOnboarding: boolean;
   setHasCompletedOnboarding: (completed: boolean) => void;
   voiceNotes: Record<number, Record<number, string>>;
@@ -54,6 +55,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [themePreference, setThemePreferenceState] =
     useState<ThemePreference>('system');
   const [language, setLanguageState] = useState<LanguageCode>('en');
+  const [isLoadingPreferences, setIsLoadingPreferences] =
+    useState<boolean>(true);
   const [hasCompletedOnboarding, setHasCompletedOnboardingState] =
     useState<boolean>(false);
   const [voiceNotes, setVoiceNotesState] = useState<
@@ -67,7 +70,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [globalDailyLimit, setGlobalDailyLimitState] = useState<number>(30); // Default 30 mins
 
   useEffect(() => {
-    AppPreferencesModule?.getPreferences()
+    if (!AppPreferencesModule) {
+      setIsLoadingPreferences(false);
+      return;
+    }
+
+    AppPreferencesModule.getPreferences()
       .then(preferences => {
         if (Array.isArray(preferences.selectedPackageNames)) {
           setSelectedPackageNamesState(preferences.selectedPackageNames);
@@ -109,7 +117,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           parseDailyLimitSettings(preferences.dailyLimitSettings),
         );
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        setIsLoadingPreferences(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -237,6 +248,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setThemePreference,
     language,
     setLanguage,
+    isLoadingPreferences,
     hasCompletedOnboarding,
     setHasCompletedOnboarding,
     voiceNotes,

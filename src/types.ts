@@ -14,6 +14,7 @@ export type TranslationKey =
   | 'appName'
   | 'settings'
   | 'close'
+  | 'loadingPreferencesLabel'
   | 'theme'
   | 'useDeviceSetting'
   | 'light'

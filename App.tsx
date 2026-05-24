@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   AppState,
   PermissionsAndroid,
   Platform,
   StyleSheet,
   StatusBar,
+  Text,
   View,
   useColorScheme,
 } from 'react-native';
@@ -91,6 +93,7 @@ function AppContent() {
   const {
     selectedPackageNames,
     setLanguage,
+    isLoadingPreferences,
     hasCompletedOnboarding,
     setHasCompletedOnboarding,
   } = useSettings();
@@ -126,7 +129,9 @@ function AppContent() {
     hasOverlayAccess &&
     hasNotificationAccess &&
     hasMicrophoneAccess;
-  const onboardingStepIndex = getOnboardingStepIndex(step);
+  const visibleStep =
+    hasCompletedOnboarding && step === 'language' ? 'dashboard' : step;
+  const onboardingStepIndex = getOnboardingStepIndex(visibleStep);
 
   async function openUsageAccessSettings() {
     if (Platform.OS !== 'android') {
@@ -315,7 +320,7 @@ function AppContent() {
   }, [hasCompletedOnboarding]);
 
   function renderContent() {
-    if (step === 'language') {
+    if (visibleStep === 'language') {
       return (
         <LanguageSelectionScreen
           onSelect={lang => {
@@ -326,7 +331,7 @@ function AppContent() {
       );
     }
 
-    if (step === 'onboarding') {
+    if (visibleStep === 'onboarding') {
       return (
         <IntroScreen
           onContinue={() => setStep('setup_permissions')}
@@ -337,7 +342,7 @@ function AppContent() {
       );
     }
 
-    if (step === 'recordings') {
+    if (visibleStep === 'recordings') {
       return (
         <VoiceRecordingScreen
           onContinue={() => setStep('apps')}
@@ -350,7 +355,7 @@ function AppContent() {
       );
     }
 
-    if (step === 'apps') {
+    if (visibleStep === 'apps') {
       return (
         <AppSelectionScreen
           availableApps={availableApps}
@@ -368,7 +373,7 @@ function AppContent() {
       );
     }
 
-    if (step === 'setup_permissions') {
+    if (visibleStep === 'setup_permissions') {
       return (
         <SetupPermissionsScreen
           hasUsageAccess={hasUsageAccess}
@@ -405,6 +410,20 @@ function AppContent() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onRefresh={refreshUsageStats}
       />
+    );
+  }
+
+  if (isLoadingPreferences) {
+    return (
+      <View style={[styles.safeArea, localStyles.loadingScreen]}>
+        <ActivityIndicator color={colors.primary} size="large" />
+        <Text style={[localStyles.loadingTitle, { color: colors.text }]}>
+          {t('appName')}
+        </Text>
+        <Text style={[localStyles.loadingBody, { color: colors.mutedText }]}>
+          {t('loadingPreferencesLabel')}
+        </Text>
+      </View>
     );
   }
 
@@ -475,6 +494,24 @@ function OnboardingProgressBar({
 }
 
 const localStyles = StyleSheet.create({
+  loadingScreen: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  loadingTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 18,
+    textAlign: 'center',
+  },
+  loadingBody: {
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+    marginTop: 8,
+    textAlign: 'center',
+  },
   progressBarContainer: {
     flexDirection: 'row',
     gap: 6,
