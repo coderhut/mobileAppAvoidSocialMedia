@@ -133,7 +133,7 @@ export function AppSelectionScreen({
           <View style={localStyles.buttonCell}>
             <PrimaryButton
               disabled={selectedPackageNames.length === 0}
-              label="Continue"
+              label={t('allSetLabel')}
               onPress={onContinue}
             />
           </View>

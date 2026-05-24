@@ -164,7 +164,7 @@ export function SetupPermissionsScreen({
           <View style={localStyles.buttonCell}>
             <PrimaryButton
               disabled={!canContinue}
-              label={canContinue ? t('allSetLabel') : 'Continue'}
+              label={t('continueLabel')}
               onPress={onContinue}
             />
           </View>

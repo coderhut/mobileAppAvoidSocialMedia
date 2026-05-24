@@ -4,6 +4,7 @@ import {
   AppState,
   PermissionsAndroid,
   Platform,
+  StyleSheet,
   StatusBar,
   View,
   useColorScheme,
@@ -86,7 +87,7 @@ function ThemedApp() {
 }
 
 function AppContent() {
-  const { styles, t } = useAppTheme();
+  const { colors, styles, t } = useAppTheme();
   const {
     selectedPackageNames,
     setLanguage,
@@ -125,6 +126,7 @@ function AppContent() {
     hasOverlayAccess &&
     hasNotificationAccess &&
     hasMicrophoneAccess;
+  const onboardingStepIndex = getOnboardingStepIndex(step);
 
   async function openUsageAccessSettings() {
     if (Platform.OS !== 'android') {
@@ -406,6 +408,13 @@ function AppContent() {
 
   return (
     <View style={styles.safeArea}>
+      {onboardingStepIndex !== null && (
+        <OnboardingProgressBar
+          activeStepIndex={onboardingStepIndex}
+          segmentColor={colors.primary}
+          trackColor={colors.border}
+        />
+      )}
       <View style={styles.appShell}>{renderContent()}</View>
       <SettingsPanel
         isVisible={isSettingsOpen}
@@ -415,5 +424,65 @@ function AppContent() {
     </View>
   );
 }
+
+const ONBOARDING_STEPS: Step[] = [
+  'language',
+  'onboarding',
+  'setup_permissions',
+  'recordings',
+  'apps',
+];
+
+function getOnboardingStepIndex(step: Step) {
+  const index = ONBOARDING_STEPS.indexOf(step);
+  return index === -1 ? null : index;
+}
+
+function OnboardingProgressBar({
+  activeStepIndex,
+  segmentColor,
+  trackColor,
+}: {
+  activeStepIndex: number;
+  segmentColor: string;
+  trackColor: string;
+}) {
+  const topOffset =
+    Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
+
+  return (
+    <View
+      style={[localStyles.progressBarContainer, { paddingTop: topOffset + 10 }]}
+      accessibilityRole="progressbar"
+    >
+      {ONBOARDING_STEPS.map((progressStep, index) => (
+        <View
+          key={progressStep}
+          style={[
+            localStyles.progressSegment,
+            {
+              backgroundColor:
+                index <= activeStepIndex ? segmentColor : trackColor,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+const localStyles = StyleSheet.create({
+  progressBarContainer: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 24,
+    marginBottom: 20,
+  },
+  progressSegment: {
+    flex: 1,
+    height: 5,
+    borderRadius: 3,
+  },
+});
 
 export default App;

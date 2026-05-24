@@ -379,7 +379,7 @@ export function VoiceRecordingScreen({
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <Text style={localStyles.recordButtonText}>
-                  {t('getStarted')} Recording
+                  {t('startRecordingLabel')}
                 </Text>
               )}
             </Pressable>
@@ -483,7 +483,7 @@ export function VoiceRecordingScreen({
           <View style={localStyles.buttonCell}>
             <PrimaryButton
               disabled={!canContinue}
-              label="Continue"
+              label={t('continueLabel')}
               onPress={handleContinue}
             />
           </View>
