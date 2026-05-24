@@ -1,6 +1,9 @@
-import type {LanguageCode, TranslationKey} from '../types';
+import type { LanguageCode, TranslationKey } from '../types';
 
-export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> = {
+export const TRANSLATIONS: Record<
+  LanguageCode,
+  Record<TranslationKey, string>
+> = {
   en: {
     appName: 'Avoid Social Media',
     settings: 'Settings',
@@ -14,7 +17,8 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     urdu: 'Urdu',
     selected: 'Selected',
     privacyNoteTitle: 'Privacy',
-    privacyNoteBody: 'No account. No cloud sync. Usage choices stay on this phone.',
+    privacyNoteBody:
+      'No account. No cloud sync. Usage choices stay on this phone.',
     introTitle: 'Protect your attention before the scroll starts.',
     introBody:
       'Choose the apps that waste your time, review your daily usage, and build healthier limits. No accounts. No cloud sync. Your choices stay on this phone.',
@@ -79,6 +83,8 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     refresh: 'Refresh',
     edit: 'Edit',
     stepThree: 'Step 3',
+    manageVoiceNotesLabel: 'Manage Voice Notes',
+    managePermissionsLabel: 'Manage Permissions',
     recordingsTitle: 'Record your voice notes.',
     recordingsBody:
       'These notes will play when you reach your app usage limits. They should be motivational or anything that would stop you from scrolling.',
@@ -93,10 +99,12 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     startRecordingLabel: 'Start Recording',
     required: 'Required',
     optional: 'Optional',
-    minRecordingsAlert: 'Please record at least one note for each level to proceed.',
+    minRecordingsAlert:
+      'Please record at least one note for each level to proceed.',
     finishSetup: 'Finish setup',
     setupPermissionsTitle: 'Permissions Setup',
-    setupPermissionsBody: 'The following permissions are required for the app to function properly.',
+    setupPermissionsBody:
+      'The following permissions are required for the app to function properly.',
     usageAccessLabel: 'Usage Access',
     usageAccessDesc: 'To track screen time in distracting apps.',
     overlayLabel: 'Overlay Permission',
@@ -189,6 +197,8 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     refresh: 'Refresh',
     edit: 'Edit',
     stepThree: 'مرحلہ 3',
+    manageVoiceNotesLabel: 'وائس نوٹس منظم کریں',
+    managePermissionsLabel: 'اجازتیں منظم کریں',
     recordingsTitle: 'اپنی آواز ریکارڈ کریں۔',
     recordingsBody:
       'یہ آوازیں تب چلیں گی جب آپ اپنی ایپ کے استعمال کی حد تک پہنچ جائیں گے۔ یہ آپ کو اسکرولنگ روکنے میں مدد کریں گی۔',
@@ -203,10 +213,12 @@ export const TRANSLATIONS: Record<LanguageCode, Record<TranslationKey, string>> 
     startRecordingLabel: 'ریکارڈنگ شروع کریں',
     required: 'لازمی',
     optional: 'اختیاری',
-    minRecordingsAlert: 'براہ کرم آگے بڑھنے کے لیے ہر لیول کے لیے کم از کم ایک آواز ریکارڈ کریں۔',
+    minRecordingsAlert:
+      'براہ کرم آگے بڑھنے کے لیے ہر لیول کے لیے کم از کم ایک آواز ریکارڈ کریں۔',
     finishSetup: 'سیٹ اپ مکمل کریں',
     setupPermissionsTitle: 'سسٹم سیٹ اپ',
-    setupPermissionsBody: 'ایپ کے صحیح طریقے سے کام کرنے کے لیے درج ذیل اجازتوں کی ضرورت ہے۔',
+    setupPermissionsBody:
+      'ایپ کے صحیح طریقے سے کام کرنے کے لیے درج ذیل اجازتوں کی ضرورت ہے۔',
     usageAccessLabel: 'Usage Access',
     usageAccessDesc: 'ڈسٹریکٹنگ ایپس میں اسکرین ٹائم ٹریک کرنے کے لیے۔',
     overlayLabel: 'اوورلے کی اجازت',

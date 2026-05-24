@@ -79,6 +79,8 @@ export type TranslationKey =
   | 'refresh'
   | 'edit'
   | 'stepThree'
+  | 'manageVoiceNotesLabel'
+  | 'managePermissionsLabel'
   | 'recordingsTitle'
   | 'recordingsBody'
   | 'level1Title'

@@ -380,7 +380,9 @@ function AppContent() {
           requestMicrophone={requestMicrophoneAccess}
           requestNotifications={requestNotificationAccess}
           onOpenSettingsMenu={() => setIsSettingsOpen(true)}
-          onBack={() => setStep('onboarding')}
+          onBack={() =>
+            setStep(hasCompletedOnboarding ? 'dashboard' : 'onboarding')
+          }
           onContinue={() => {
             if (!hasAllOnboardingPermissions) {
               return;
@@ -420,6 +422,7 @@ function AppContent() {
         isVisible={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onEditRecordings={() => setStep('recordings')}
+        onManagePermissions={() => setStep('setup_permissions')}
       />
     </View>
   );
@@ -452,7 +455,7 @@ function OnboardingProgressBar({
 
   return (
     <View
-      style={[localStyles.progressBarContainer, { paddingTop: topOffset + 10 }]}
+      style={[localStyles.progressBarContainer, { paddingTop: topOffset + 3 }]}
       accessibilityRole="progressbar"
     >
       {ONBOARDING_STEPS.map((progressStep, index) => (
@@ -476,7 +479,7 @@ const localStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     paddingHorizontal: 24,
-    marginBottom: 20,
+    marginBottom: 7,
   },
   progressSegment: {
     flex: 1,

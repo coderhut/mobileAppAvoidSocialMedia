@@ -1,5 +1,5 @@
-import {StyleSheet} from 'react-native';
-import type {ThemeColors} from '../types';
+import { StyleSheet } from 'react-native';
+import type { ThemeColors } from '../types';
 
 export function createThemedStyles(colors: ThemeColors) {
   return StyleSheet.create({
@@ -59,6 +59,39 @@ export function createThemedStyles(colors: ThemeColors) {
       padding: 24,
       paddingTop: 40,
       width: '85%',
+    },
+    bottomSheetOverlay: {
+      bottom: 0,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      justifyContent: 'flex-end',
+    },
+    bottomSheetBackdrop: {
+      backgroundColor: 'rgba(15, 23, 42, 0.35)',
+      bottom: 0,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+    },
+    bottomSheet: {
+      backgroundColor: colors.background,
+      borderTopColor: colors.border,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderTopWidth: 1,
+      padding: 24,
+      paddingBottom: 36,
+    },
+    bottomSheetHandle: {
+      alignSelf: 'center',
+      backgroundColor: colors.border,
+      borderRadius: 2,
+      height: 4,
+      marginBottom: 20,
+      width: 48,
     },
     settingsHeader: {
       alignItems: 'center',

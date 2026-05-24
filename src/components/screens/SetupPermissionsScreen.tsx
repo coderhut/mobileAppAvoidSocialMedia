@@ -1,8 +1,15 @@
 import React from 'react';
-import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
-import {PrimaryButton} from '../common/PrimaryButton';
-import {SecondaryButton} from '../common/SecondaryButton';
-import {useAppTheme} from '../../theme/ThemeContext';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { PrimaryButton } from '../common/PrimaryButton';
+import { SecondaryButton } from '../common/SecondaryButton';
+import { useAppTheme } from '../../theme/ThemeContext';
 
 type PermissionKey = 'usage' | 'overlay' | 'microphone' | 'notification';
 
@@ -33,7 +40,7 @@ export function SetupPermissionsScreen({
   onOpenSettingsMenu?: () => void;
   hideHeader?: boolean;
 }) {
-  const {colors, styles, t} = useAppTheme();
+  const { colors, styles, t } = useAppTheme();
   const [pendingPermission, setPendingPermission] =
     React.useState<PermissionKey | null>(null);
 
@@ -65,20 +72,36 @@ export function SetupPermissionsScreen({
     label: string,
     desc: string,
     isGranted: boolean,
-    onPress: () => void | Promise<void>
+    onPress: () => void | Promise<void>,
   ) => {
     const isPending = pendingPermission === permission;
 
     return (
-      <View style={[localStyles.itemContainer, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+      <View
+        style={[
+          localStyles.itemContainer,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
         <View style={localStyles.itemInfo}>
-          <Text style={[localStyles.itemLabel, {color: colors.text}]}>{label}</Text>
-          <Text style={[localStyles.itemDesc, {color: colors.mutedText}]}>{desc}</Text>
+          <Text style={[localStyles.itemLabel, { color: colors.text }]}>
+            {label}
+          </Text>
+          <Text style={[localStyles.itemDesc, { color: colors.mutedText }]}>
+            {desc}
+          </Text>
         </View>
         <View style={localStyles.itemAction}>
           {isGranted ? (
-            <View style={[localStyles.checkCircle, {backgroundColor: colors.success + '20'}]}>
-              <Text style={[localStyles.checkMark, {color: colors.success}]}>✓</Text>
+            <View
+              style={[
+                localStyles.checkCircle,
+                { backgroundColor: colors.success + '20' },
+              ]}
+            >
+              <Text style={[localStyles.checkMark, { color: colors.success }]}>
+                ✓
+              </Text>
             </View>
           ) : (
             <Pressable
@@ -86,13 +109,16 @@ export function SetupPermissionsScreen({
               onPress={() => handleGrant(permission, onPress)}
               style={[
                 localStyles.grantButton,
-                {backgroundColor: colors.primary},
+                { backgroundColor: colors.primary },
                 !!pendingPermission && !isPending && localStyles.disabledButton,
-              ]}>
+              ]}
+            >
               {isPending ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={localStyles.grantButtonText}>{t('grantLabel')}</Text>
+                <Text style={localStyles.grantButtonText}>
+                  {t('grantLabel')}
+                </Text>
               )}
             </Pressable>
           )}
@@ -102,14 +128,18 @@ export function SetupPermissionsScreen({
   };
 
   return (
-    <View style={styles.scrollContent}>
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       {!hideHeader && (
         <View style={styles.topBar}>
           <Text style={styles.eyebrow}>{t('stepOne')}</Text>
           <Pressable
             accessibilityRole="button"
             onPress={onOpenSettingsMenu}
-            style={styles.themeToggle}>
+            style={styles.themeToggle}
+          >
             <View style={styles.menuIcon}>
               <View style={styles.menuBar} />
               <View style={styles.menuBar} />
@@ -128,7 +158,7 @@ export function SetupPermissionsScreen({
           t('usageAccessLabel'),
           t('usageAccessDesc'),
           hasUsageAccess,
-          onOpenUsageSettings
+          onOpenUsageSettings,
         )}
 
         {renderPermissionItem(
@@ -136,7 +166,7 @@ export function SetupPermissionsScreen({
           t('overlayLabel'),
           t('overlayDesc'),
           hasOverlayAccess,
-          onOpenOverlaySettings
+          onOpenOverlaySettings,
         )}
 
         {renderPermissionItem(
@@ -144,7 +174,7 @@ export function SetupPermissionsScreen({
           t('microphoneLabel'),
           t('microphoneDesc'),
           hasMicrophoneAccess,
-          requestMicrophone
+          requestMicrophone,
         )}
 
         {renderPermissionItem(
@@ -152,7 +182,7 @@ export function SetupPermissionsScreen({
           t('notificationLabel'),
           t('notificationDesc'),
           hasNotificationAccess,
-          requestNotifications
+          requestNotifications,
         )}
       </View>
 
@@ -170,7 +200,7 @@ export function SetupPermissionsScreen({
           </View>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -234,8 +264,8 @@ const localStyles = StyleSheet.create({
     fontSize: 14,
   },
   footer: {
-    marginTop: 48,
-    marginBottom: 60,
+    marginTop: 32,
+    marginBottom: 24,
     paddingBottom: 40,
   },
   buttonRow: {
@@ -244,5 +274,5 @@ const localStyles = StyleSheet.create({
   },
   buttonCell: {
     flex: 1,
-  }
+  },
 });

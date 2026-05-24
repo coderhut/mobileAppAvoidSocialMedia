@@ -1,18 +1,29 @@
-import React, {useEffect, useRef} from 'react';
-import {Animated, Dimensions, Modal, Pressable, Text, View} from 'react-native';
-import {useAppTheme} from '../../theme/ThemeContext';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Modal,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
+import { useAppTheme } from '../../theme/ThemeContext';
 
-const {width} = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export function SettingsPanel({
   isVisible,
   onClose,
   onEditRecordings,
+  onManagePermissions,
 }: {
   isVisible: boolean;
   onClose: () => void;
   onEditRecordings?: () => void;
+  onManagePermissions?: () => void;
 }) {
+  const [isThemeSheetOpen, setIsThemeSheetOpen] = useState(false);
+  const [isLanguageSheetOpen, setIsLanguageSheetOpen] = useState(false);
   const {
     language,
     setLanguage,
@@ -23,6 +34,13 @@ export function SettingsPanel({
   } = useAppTheme();
 
   const slideAnim = useRef(new Animated.Value(width)).current;
+  const currentThemeLabel =
+    themePreference === 'system'
+      ? t('useDeviceSetting')
+      : themePreference === 'light'
+      ? t('light')
+      : t('dark');
+  const currentLanguageLabel = language === 'en' ? t('english') : t('urdu');
 
   useEffect(() => {
     if (isVisible) {
@@ -41,6 +59,8 @@ export function SettingsPanel({
   }, [isVisible, slideAnim]);
 
   const handleClose = () => {
+    setIsThemeSheetOpen(false);
+    setIsLanguageSheetOpen(false);
     Animated.timing(slideAnim, {
       toValue: width,
       duration: 250,
@@ -55,16 +75,18 @@ export function SettingsPanel({
       animationType="none"
       onRequestClose={handleClose}
       transparent
-      visible={isVisible}>
+      visible={isVisible}
+    >
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalBackdrop} onPress={handleClose} />
         <Animated.View
           style={[
             styles.settingsPanel,
             {
-              transform: [{translateX: slideAnim}],
+              transform: [{ translateX: slideAnim }],
             },
-          ]}>
+          ]}
+        >
           <View style={styles.settingsHeader}>
             <Text style={styles.settingsTitle}>{t('settings')}</Text>
             <Pressable onPress={handleClose} style={styles.closeButton}>
@@ -72,51 +94,55 @@ export function SettingsPanel({
             </Pressable>
           </View>
 
-          <Text style={styles.settingsSectionTitle}>{t('theme')}</Text>
           <View style={styles.optionList}>
-            <SettingsOption
-              isSelected={themePreference === 'system'}
-              label={t('useDeviceSetting')}
-              onPress={() => setThemePreference('system')}
-            />
-            <SettingsOption
-              isSelected={themePreference === 'light'}
-              label={t('light')}
-              onPress={() => setThemePreference('light')}
-            />
-            <SettingsOption
-              isSelected={themePreference === 'dark'}
-              label={t('dark')}
-              onPress={() => setThemePreference('dark')}
-            />
-          </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsLanguageSheetOpen(true)}
+              style={styles.optionRow}
+            >
+              <Text style={styles.optionLabel}>{t('language')}</Text>
+              <Text style={styles.optionSelected}>{currentLanguageLabel}</Text>
+            </Pressable>
 
-          <Text style={styles.settingsSectionTitle}>{t('language')}</Text>
-          <View style={styles.optionList}>
-            <SettingsOption
-              isSelected={language === 'en'}
-              label={t('english')}
-              onPress={() => setLanguage('en')}
-            />
-            <SettingsOption
-              isSelected={language === 'ur'}
-              label={t('urdu')}
-              onPress={() => setLanguage('ur')}
-            />
-          </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsThemeSheetOpen(true)}
+              style={styles.optionRow}
+            >
+              <Text style={styles.optionLabel}>{t('theme')}</Text>
+              <Text style={styles.optionSelected}>{currentThemeLabel}</Text>
+            </Pressable>
 
-          {onEditRecordings && (
-            <View style={{marginTop: 12}}>
+            {onEditRecordings && (
               <Pressable
+                accessibilityRole="button"
                 onPress={() => {
                   handleClose();
                   onEditRecordings();
                 }}
-                style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>{t('recordingsTitle')}</Text>
+                style={styles.optionRow}
+              >
+                <Text style={styles.optionLabel}>
+                  {t('manageVoiceNotesLabel')}
+                </Text>
               </Pressable>
-            </View>
-          )}
+            )}
+
+            {onManagePermissions && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  handleClose();
+                  onManagePermissions();
+                }}
+                style={styles.optionRow}
+              >
+                <Text style={styles.optionLabel}>
+                  {t('managePermissionsLabel')}
+                </Text>
+              </Pressable>
+            )}
+          </View>
 
           <View style={styles.privacyBox}>
             <Text style={styles.noticeTitle}>{t('privacyNoteTitle')}</Text>
@@ -124,7 +150,120 @@ export function SettingsPanel({
           </View>
         </Animated.View>
       </View>
+      <ThemeBottomSheet
+        isVisible={isThemeSheetOpen}
+        onClose={() => setIsThemeSheetOpen(false)}
+        onSelectTheme={preference => {
+          setThemePreference(preference);
+          setIsThemeSheetOpen(false);
+        }}
+        selectedTheme={themePreference}
+      />
+      <LanguageBottomSheet
+        isVisible={isLanguageSheetOpen}
+        onClose={() => setIsLanguageSheetOpen(false)}
+        onSelectLanguage={nextLanguage => {
+          setLanguage(nextLanguage);
+          setIsLanguageSheetOpen(false);
+        }}
+        selectedLanguage={language}
+      />
     </Modal>
+  );
+}
+
+function ThemeBottomSheet({
+  isVisible,
+  onClose,
+  onSelectTheme,
+  selectedTheme,
+}: {
+  isVisible: boolean;
+  onClose: () => void;
+  onSelectTheme: (preference: 'system' | 'light' | 'dark') => void;
+  selectedTheme: 'system' | 'light' | 'dark';
+}) {
+  const { styles, t } = useAppTheme();
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <View style={styles.bottomSheetOverlay}>
+      <Pressable style={styles.bottomSheetBackdrop} onPress={onClose} />
+      <View style={styles.bottomSheet}>
+        <View style={styles.bottomSheetHandle} />
+        <View style={styles.settingsHeader}>
+          <Text style={styles.settingsTitle}>{t('theme')}</Text>
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>{t('close')}</Text>
+          </Pressable>
+        </View>
+        <View style={styles.optionList}>
+          <SettingsOption
+            isSelected={selectedTheme === 'system'}
+            label={t('useDeviceSetting')}
+            onPress={() => onSelectTheme('system')}
+          />
+          <SettingsOption
+            isSelected={selectedTheme === 'light'}
+            label={t('light')}
+            onPress={() => onSelectTheme('light')}
+          />
+          <SettingsOption
+            isSelected={selectedTheme === 'dark'}
+            label={t('dark')}
+            onPress={() => onSelectTheme('dark')}
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function LanguageBottomSheet({
+  isVisible,
+  onClose,
+  onSelectLanguage,
+  selectedLanguage,
+}: {
+  isVisible: boolean;
+  onClose: () => void;
+  onSelectLanguage: (language: 'en' | 'ur') => void;
+  selectedLanguage: 'en' | 'ur';
+}) {
+  const { styles, t } = useAppTheme();
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <View style={styles.bottomSheetOverlay}>
+      <Pressable style={styles.bottomSheetBackdrop} onPress={onClose} />
+      <View style={styles.bottomSheet}>
+        <View style={styles.bottomSheetHandle} />
+        <View style={styles.settingsHeader}>
+          <Text style={styles.settingsTitle}>{t('language')}</Text>
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>{t('close')}</Text>
+          </Pressable>
+        </View>
+        <View style={styles.optionList}>
+          <SettingsOption
+            isSelected={selectedLanguage === 'en'}
+            label={t('english')}
+            onPress={() => onSelectLanguage('en')}
+          />
+          <SettingsOption
+            isSelected={selectedLanguage === 'ur'}
+            label={t('urdu')}
+            onPress={() => onSelectLanguage('ur')}
+          />
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -137,16 +276,19 @@ function SettingsOption({
   label: string;
   onPress: () => void;
 }) {
-  const {styles, t} = useAppTheme();
+  const { styles, t } = useAppTheme();
 
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityState={{checked: isSelected}}
+      accessibilityState={{ checked: isSelected }}
       onPress={onPress}
-      style={[styles.optionRow, isSelected && styles.optionRowSelected]}>
+      style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+    >
       <Text style={styles.optionLabel}>{label}</Text>
-      {isSelected ? <Text style={styles.optionSelected}>{t('selected')}</Text> : null}
+      {isSelected ? (
+        <Text style={styles.optionSelected}>{t('selected')}</Text>
+      ) : null}
     </Pressable>
   );
 }
