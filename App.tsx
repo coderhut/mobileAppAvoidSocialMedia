@@ -342,7 +342,9 @@ function AppContent() {
     if (visibleStep === 'recordings') {
       return (
         <VoiceRecordingScreen
-          onContinue={() => setStep('apps')}
+          onContinue={() =>
+            setStep(hasCompletedOnboarding ? 'dashboard' : 'apps')
+          }
           onBack={() =>
             setStep(hasCompletedOnboarding ? 'dashboard' : 'setup_permissions')
           }

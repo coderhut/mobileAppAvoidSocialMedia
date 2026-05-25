@@ -10,7 +10,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  ToastAndroid,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -344,19 +343,6 @@ export function VoiceRecordingScreen({
     return t('requiredVoiceNoteAlert');
   };
 
-  const showVoiceNotesSavedMessage = () => {
-    showVoiceNotesToast(t('voiceNotesSavedAlert'));
-  };
-
-  const showVoiceNotesToast = (message: string) => {
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(message, ToastAndroid.SHORT);
-      return;
-    }
-
-    Alert.alert(t('appName'), message);
-  };
-
   const highlightMissingRequiredSlot = (level: number) => {
     const slotKey = getSlotKey(level, 0);
     const levelYPosition = requiredLevelYPositions.current[level] ?? 0;
@@ -406,7 +392,7 @@ export function VoiceRecordingScreen({
       }
 
       setRequiredMessageSlotKey(null);
-      showVoiceNotesSavedMessage();
+      onContinue();
       return;
     }
 
@@ -678,6 +664,7 @@ export function VoiceRecordingScreen({
       headerTitle={!hideHeader ? t('voiceNotesTitle') : undefined}
       title={hideHeader ? t('recordingsTitle') : ''}
       body={t('recordingsBody')}
+      onGoHome={!hideHeader ? onBack : undefined}
       onOpenSettings={onOpenSettings}
       hideHeader={hideHeader}
       fixedHeader={!hideHeader}

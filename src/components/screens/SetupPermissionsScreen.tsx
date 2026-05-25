@@ -248,17 +248,34 @@ export function SetupPermissionsScreen({
   const header = !hideHeader ? (
     <View style={[styles.topBar, localStyles.fixedHeaderPadding]}>
       <Text style={styles.sectionTitle}>{t('setupPermissionsTitle')}</Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onOpenSettingsMenu}
-        style={styles.themeToggle}
-      >
-        <View style={styles.menuIcon}>
-          <View style={styles.menuBar} />
-          <View style={styles.menuBar} />
-          <View style={styles.menuBar} />
-        </View>
-      </Pressable>
+      <View style={localStyles.headerActions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Home"
+          onPress={onBack}
+          style={styles.themeToggle}
+        >
+          <View style={localStyles.homeIcon}>
+            <View
+              style={[localStyles.homeRoof, { borderColor: colors.primary }]}
+            />
+            <View
+              style={[localStyles.homeBase, { borderColor: colors.primary }]}
+            />
+          </View>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenSettingsMenu}
+          style={styles.themeToggle}
+        >
+          <View style={styles.menuIcon}>
+            <View style={styles.menuBar} />
+            <View style={styles.menuBar} />
+            <View style={styles.menuBar} />
+          </View>
+        </Pressable>
+      </View>
     </View>
   ) : null;
 
@@ -343,6 +360,35 @@ export function SetupPermissionsScreen({
 }
 
 const localStyles = StyleSheet.create({
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  homeIcon: {
+    height: 28,
+    width: 28,
+  },
+  homeRoof: {
+    borderLeftWidth: 2.5,
+    borderTopWidth: 2.5,
+    height: 15,
+    left: 6,
+    position: 'absolute',
+    top: 3,
+    transform: [{ rotate: '45deg' }],
+    width: 15,
+  },
+  homeBase: {
+    borderBottomWidth: 2.5,
+    borderLeftWidth: 2.5,
+    borderRightWidth: 2.5,
+    bottom: 4,
+    height: 11,
+    left: 7,
+    position: 'absolute',
+    width: 14,
+  },
   fixedHeaderPadding: {
     paddingHorizontal: 24,
     paddingTop: 24,
