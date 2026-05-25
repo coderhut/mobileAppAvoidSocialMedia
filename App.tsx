@@ -125,10 +125,7 @@ function AppContent() {
   }, [selectedPackageNames, usageByPackage]);
 
   const hasAllOnboardingPermissions =
-    hasUsageAccess &&
-    hasOverlayAccess &&
-    hasNotificationAccess &&
-    hasMicrophoneAccess;
+    hasUsageAccess && hasOverlayAccess && hasMicrophoneAccess;
   const visibleStep =
     hasCompletedOnboarding && step === 'language' ? 'dashboard' : step;
   const onboardingStepIndex = getOnboardingStepIndex(visibleStep);
@@ -392,7 +389,7 @@ function AppContent() {
             if (!hasAllOnboardingPermissions) {
               return;
             }
-            setStep('recordings');
+            setStep(hasCompletedOnboarding ? 'dashboard' : 'recordings');
           }}
           hideHeader={!hasCompletedOnboarding}
         />

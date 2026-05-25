@@ -119,12 +119,19 @@ export const TRANSLATIONS: Record<
     setupPermissionsTitle: 'Permissions Setup',
     setupPermissionsBody:
       'The following permissions are required for the app to function properly.',
+    doneSettingPermissionsLabel: 'Done Setting Permissions',
     usageAccessLabel: 'Usage Access',
     usageAccessDesc: 'To track screen time in distracting apps.',
+    usageAccessRequiredMessage:
+      'App requires Usage Access to measure screen time in the distracting apps you choose.',
     overlayLabel: 'Overlay Permission',
     overlayDesc: 'To show "STOP" screen over other apps.',
+    overlayRequiredMessage:
+      'App requires Overlay Permission to show the STOP intervention over distracting apps.',
     microphoneLabel: 'Microphone',
     microphoneDesc: 'To record your voice interventions.',
+    microphoneRequiredMessage:
+      'App requires Microphone permission so you can record your voice intervention notes.',
     notificationLabel: 'Notifications',
     notificationDesc: 'To keep monitoring service active.',
     grantLabel: 'Grant',
@@ -247,12 +254,19 @@ export const TRANSLATIONS: Record<
     setupPermissionsTitle: 'سسٹم سیٹ اپ',
     setupPermissionsBody:
       'ایپ کے صحیح طریقے سے کام کرنے کے لیے درج ذیل اجازتوں کی ضرورت ہے۔',
+    doneSettingPermissionsLabel: 'اجازتوں کی ترتیب مکمل',
     usageAccessLabel: 'Usage Access',
     usageAccessDesc: 'ڈسٹریکٹنگ ایپس میں اسکرین ٹائم ٹریک کرنے کے لیے۔',
+    usageAccessRequiredMessage:
+      'ایپ کو آپ کی منتخب کردہ ڈسٹریکٹنگ ایپس کا اسکرین ٹائم ناپنے کے لیے Usage Access کی ضرورت ہے۔',
     overlayLabel: 'اوورلے کی اجازت',
     overlayDesc: 'دوسری ایپس پر "STOP" اسکرین دکھانے کے لیے۔',
+    overlayRequiredMessage:
+      'ایپ کو ڈسٹریکٹنگ ایپس کے اوپر STOP مداخلت دکھانے کے لیے اوورلے اجازت کی ضرورت ہے۔',
     microphoneLabel: 'مائیکروفون',
     microphoneDesc: 'اپنی آواز ریکارڈ کرنے کے لیے۔',
+    microphoneRequiredMessage:
+      'ایپ کو آپ کے وائس انٹروینشن نوٹس ریکارڈ کرنے کے لیے مائیکروفون اجازت کی ضرورت ہے۔',
     notificationLabel: 'اطلاعات',
     notificationDesc: 'مانیٹرنگ سروس کو فعال رکھنے کے لیے۔',
     grantLabel: 'اجازت دیں',

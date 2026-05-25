@@ -680,6 +680,7 @@ export function VoiceRecordingScreen({
       body={t('recordingsBody')}
       onOpenSettings={onOpenSettings}
       hideHeader={hideHeader}
+      fixedHeader={!hideHeader}
       scrollRef={scrollRef}
     >
       <View style={[localStyles.divider, { backgroundColor: colors.border }]} />
