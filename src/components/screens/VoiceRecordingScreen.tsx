@@ -2,12 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Modal,
   PermissionsAndroid,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  ToastAndroid,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import AudioRecorderPlayer, {
@@ -43,6 +47,7 @@ export function VoiceRecordingScreen({
   hideHeader?: boolean;
 }) {
   const { colors, mode, t } = useAppTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const {
     voiceNotes,
     voiceNoteDurations,
@@ -80,6 +85,16 @@ export function VoiceRecordingScreen({
   const activeSlotRef = useRef<{ level: number; index: number } | null>(null);
   const recordDurationMsRef = useRef(0);
   const isStoppingRef = useRef(false);
+  const scrollRef = useRef<ScrollView | null>(null);
+  const requiredLevelYPositions = useRef<Record<number, number>>({});
+  const requiredSlotYPositions = useRef<Record<number, number>>({});
+  const highlightAnim = useRef(new Animated.Value(0)).current;
+  const [highlightedSlotKey, setHighlightedSlotKey] = useState<string | null>(
+    null,
+  );
+  const [requiredMessageSlotKey, setRequiredMessageSlotKey] = useState<
+    string | null
+  >(null);
 
   const audioRecorderPlayer = useRef(new AudioRecorderPlayer()).current;
 
@@ -115,6 +130,8 @@ export function VoiceRecordingScreen({
       return;
     }
 
+    setRequiredMessageSlotKey(null);
+    setHighlightedSlotKey(null);
     isStartingRef.current = true;
     setStartingSlot({ level, index });
     try {
@@ -319,7 +336,80 @@ export function VoiceRecordingScreen({
   const canContinue =
     isLevelComplete(1) && isLevelComplete(2) && isLevelComplete(3);
 
+  const findMissingRequiredLevel = () => {
+    return [1, 2, 3].find(level => !voiceNotes[level]?.[0]) ?? null;
+  };
+
+  const showRequiredVoiceNoteMessage = () => {
+    return t('requiredVoiceNoteAlert');
+  };
+
+  const showVoiceNotesSavedMessage = () => {
+    showVoiceNotesToast(t('voiceNotesSavedAlert'));
+  };
+
+  const showVoiceNotesToast = (message: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+      return;
+    }
+
+    Alert.alert(t('appName'), message);
+  };
+
+  const highlightMissingRequiredSlot = (level: number) => {
+    const slotKey = getSlotKey(level, 0);
+    const levelYPosition = requiredLevelYPositions.current[level] ?? 0;
+    const slotYPosition = requiredSlotYPositions.current[level] ?? 0;
+    const yPosition = levelYPosition + slotYPosition;
+    const targetY = yPosition - windowHeight * 0.45;
+
+    scrollRef.current?.scrollTo({
+      y: Math.max(targetY, 0),
+      animated: true,
+    });
+
+    setHighlightedSlotKey(slotKey);
+    highlightAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(highlightAnim, {
+        toValue: 1,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+      Animated.timing(highlightAnim, {
+        toValue: 0,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+      Animated.timing(highlightAnim, {
+        toValue: 1,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+      Animated.timing(highlightAnim, {
+        toValue: 0,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setHighlightedSlotKey(null));
+  };
+
   const handleContinue = () => {
+    if (!hideHeader) {
+      const missingRequiredLevel = findMissingRequiredLevel();
+
+      if (missingRequiredLevel) {
+        setRequiredMessageSlotKey(getSlotKey(missingRequiredLevel, 0));
+        highlightMissingRequiredSlot(missingRequiredLevel);
+        return;
+      }
+
+      setRequiredMessageSlotKey(null);
+      showVoiceNotesSavedMessage();
+      return;
+    }
+
     if (canContinue) {
       onContinue();
     } else {
@@ -354,103 +444,122 @@ export function VoiceRecordingScreen({
       : t('readyLabel');
     const slotStatusColor =
       isPlaying && !isPlaybackPaused ? colors.success : colors.subtleText;
+    const isHighlighted = highlightedSlotKey === slotKey;
+    const hasRequiredMessage = requiredMessageSlotKey === slotKey;
+    const highlightTranslateX = highlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 8],
+    });
 
     return (
-      <View
-        key={`${level}-${index}`}
-        style={[
-          localStyles.slotCard,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-            shadowColor: mode === 'dark' ? '#000000' : '#0F172A',
-          },
-        ]}
-      >
-        <View style={localStyles.slotHeader}>
-          <View
-            style={[
-              localStyles.slotNumber,
-              {
-                backgroundColor:
-                  mode === 'dark' ? '#23324A' : colors.noticeBackground,
-              },
-            ]}
-          >
-            <Text
-              style={[localStyles.slotNumberText, { color: colors.primary }]}
-            >
-              {index + 1}
-            </Text>
-          </View>
-          <Text style={[localStyles.slotLabel, { color: colors.text }]}>
-            {index === 0 ? t('required') : t('optional')}
-          </Text>
-          {isRecorded && (
-            <Pressable
-              onPress={() => deleteVoiceNote(level, index)}
-              style={localStyles.deleteIcon}
-            >
-              <Text style={localStyles.deleteIconText}>⌫</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {isRecorded ? (
-          <>
+      <React.Fragment key={`${level}-${index}`}>
+        <Animated.View
+          onLayout={event => {
+            if (index === 0) {
+              requiredSlotYPositions.current[level] =
+                event.nativeEvent.layout.y;
+            }
+          }}
+          style={[
+            localStyles.slotCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor:
+                isHighlighted || hasRequiredMessage ? '#EF4444' : colors.border,
+              shadowColor: mode === 'dark' ? '#000000' : '#0F172A',
+            },
+            isHighlighted && {
+              transform: [{ translateX: highlightTranslateX }],
+            },
+          ]}
+        >
+          <View style={localStyles.slotHeader}>
             <View
               style={[
-                localStyles.waveformPanel,
+                localStyles.slotNumber,
                 {
                   backgroundColor:
-                    mode === 'dark' ? '#4B5563' : colors.surfaceAlt,
-                  borderColor: mode === 'dark' ? '#7B8492' : colors.border,
+                    mode === 'dark' ? '#23324A' : colors.noticeBackground,
                 },
               ]}
             >
+              <Text
+                style={[localStyles.slotNumberText, { color: colors.primary }]}
+              >
+                {index + 1}
+              </Text>
+            </View>
+            <Text style={[localStyles.slotLabel, { color: colors.text }]}>
+              {index === 0 ? t('required') : t('optional')}
+            </Text>
+            {isRecorded && (
               <Pressable
-                onPress={
-                  isPlaying
-                    ? isPlaybackPaused
-                      ? onResumeBack
-                      : onPauseBack
-                    : () => onPlayBack(path, level, index)
-                }
+                onPress={() => deleteVoiceNote(level, index)}
+                style={localStyles.deleteIcon}
+              >
+                <Text style={localStyles.deleteIconText}>⌫</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {isRecorded ? (
+            <>
+              <View
                 style={[
-                  localStyles.roundActionButton,
+                  localStyles.waveformPanel,
                   {
                     backgroundColor:
-                      mode === 'dark' ? '#38BDF8' : colors.primary,
+                      mode === 'dark' ? '#4B5563' : colors.surfaceAlt,
+                    borderColor: mode === 'dark' ? '#7B8492' : colors.border,
                   },
                 ]}
               >
-                <Text style={localStyles.roundActionText}>
-                  {isPlaying && !isPlaybackPaused ? 'Ⅱ' : '▷'}
-                </Text>
-              </Pressable>
-              <WaveformStrip
-                colors={colors}
-                mode={mode}
-                progressRatio={progressRatio}
-              />
-              <View style={localStyles.timeGroup}>
-                <Text
+                <Pressable
+                  onPress={
+                    isPlaying
+                      ? isPlaybackPaused
+                        ? onResumeBack
+                        : onPauseBack
+                      : () => onPlayBack(path, level, index)
+                  }
                   style={[
-                    localStyles.elapsedText,
-                    { color: mode === 'dark' ? '#FFFFFF' : colors.text },
+                    localStyles.roundActionButton,
+                    {
+                      backgroundColor:
+                        mode === 'dark' ? '#38BDF8' : colors.primary,
+                    },
                   ]}
                 >
-                  {formatPlaybackTime(currentMs)}
-                </Text>
-                <Text
-                  style={[localStyles.totalText, { color: colors.subtleText }]}
-                >
-                  {formatPlaybackTime(durationMs)}
-                </Text>
+                  <Text style={localStyles.roundActionText}>
+                    {isPlaying && !isPlaybackPaused ? 'Ⅱ' : '▷'}
+                  </Text>
+                </Pressable>
+                <WaveformStrip
+                  colors={colors}
+                  mode={mode}
+                  progressRatio={progressRatio}
+                />
+                <View style={localStyles.timeGroup}>
+                  <Text
+                    style={[
+                      localStyles.elapsedText,
+                      { color: mode === 'dark' ? '#FFFFFF' : colors.text },
+                    ]}
+                  >
+                    {formatPlaybackTime(currentMs)}
+                  </Text>
+                  <Text
+                    style={[
+                      localStyles.totalText,
+                      { color: colors.subtleText },
+                    ]}
+                  >
+                    {formatPlaybackTime(durationMs)}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            {/*
+              {/*
             <View style={localStyles.playbackControls}>
               <Pressable
                 onPress={
@@ -512,45 +621,66 @@ export function VoiceRecordingScreen({
               </View>
             </View>
             */}
-          </>
-        ) : (
-          <Pressable
-            disabled={!!startingSlot}
-            onPress={() => onStartRecord(level, index)}
+            </>
+          ) : (
+            <Pressable
+              disabled={!!startingSlot}
+              onPress={() => onStartRecord(level, index)}
+              style={[
+                localStyles.recordButton,
+                {
+                  backgroundColor: mode === 'dark' ? '#172132' : '#FFFFFF',
+                  borderColor: mode === 'dark' ? '#263A57' : colors.border,
+                },
+                !!startingSlot && !isStarting && localStyles.disabledButton,
+              ]}
+            >
+              {isStarting ? (
+                <ActivityIndicator color="#EF4444" size="small" />
+              ) : (
+                <>
+                  <View style={localStyles.recordDot} />
+                  <Text
+                    style={[
+                      localStyles.recordButtonText,
+                      { color: colors.text },
+                    ]}
+                  >
+                    {t('startRecordingLabel')}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          )}
+        </Animated.View>
+        {requiredMessageSlotKey === slotKey && (
+          <View
             style={[
-              localStyles.recordButton,
+              localStyles.requiredToast,
               {
-                backgroundColor: mode === 'dark' ? '#172132' : '#FFFFFF',
-                borderColor: mode === 'dark' ? '#263A57' : colors.border,
+                backgroundColor: mode === 'dark' ? '#3A1820' : '#FEE2E2',
+                borderColor: '#EF4444',
               },
-              !!startingSlot && !isStarting && localStyles.disabledButton,
             ]}
           >
-            {isStarting ? (
-              <ActivityIndicator color="#EF4444" size="small" />
-            ) : (
-              <>
-                <View style={localStyles.recordDot} />
-                <Text
-                  style={[localStyles.recordButtonText, { color: colors.text }]}
-                >
-                  {t('startRecordingLabel')}
-                </Text>
-              </>
-            )}
-          </Pressable>
+            <Text style={localStyles.requiredToastText}>
+              {showRequiredVoiceNoteMessage()}
+            </Text>
+          </View>
         )}
-      </View>
+      </React.Fragment>
     );
   };
 
   return (
     <ScreenScaffold
       eyebrow={hideHeader ? t('stepTwo') : ''}
-      title={t('recordingsTitle')}
+      headerTitle={!hideHeader ? t('voiceNotesTitle') : undefined}
+      title={hideHeader ? t('recordingsTitle') : ''}
       body={t('recordingsBody')}
       onOpenSettings={onOpenSettings}
       hideHeader={hideHeader}
+      scrollRef={scrollRef}
     >
       <View style={[localStyles.divider, { backgroundColor: colors.border }]} />
 
@@ -562,6 +692,9 @@ export function VoiceRecordingScreen({
         colors={colors}
         complete={isLevelComplete(1)}
         mode={mode}
+        onLayout={y => {
+          requiredLevelYPositions.current[1] = y;
+        }}
         t={t}
       />
 
@@ -573,6 +706,9 @@ export function VoiceRecordingScreen({
         colors={colors}
         complete={isLevelComplete(2)}
         mode={mode}
+        onLayout={y => {
+          requiredLevelYPositions.current[2] = y;
+        }}
         t={t}
       />
 
@@ -584,6 +720,9 @@ export function VoiceRecordingScreen({
         colors={colors}
         complete={isLevelComplete(3)}
         mode={mode}
+        onLayout={y => {
+          requiredLevelYPositions.current[3] = y;
+        }}
         t={t}
       />
 
@@ -645,13 +784,15 @@ export function VoiceRecordingScreen({
 
       <View style={localStyles.footer}>
         <View style={localStyles.buttonRow}>
-          <View style={localStyles.buttonCell}>
-            <SecondaryButton label="Go Back" onPress={onBack} />
-          </View>
+          {hideHeader && (
+            <View style={localStyles.buttonCell}>
+              <SecondaryButton label="Go Back" onPress={onBack} />
+            </View>
+          )}
           <View style={localStyles.buttonCell}>
             <PrimaryButton
-              disabled={!canContinue}
-              label={t('continueLabel')}
+              disabled={hideHeader && !canContinue}
+              label={hideHeader ? t('continueLabel') : t('saveLabel')}
               onPress={handleContinue}
             />
           </View>
@@ -669,6 +810,7 @@ function LevelSection({
   colors,
   complete,
   mode,
+  onLayout,
   t,
 }: {
   title: string;
@@ -678,10 +820,14 @@ function LevelSection({
   colors: ThemeColors;
   complete: boolean;
   mode: ThemeMode;
+  onLayout: (y: number) => void;
   t: (key: TranslationKey) => string;
 }) {
   return (
-    <View style={localStyles.levelSection}>
+    <View
+      style={localStyles.levelSection}
+      onLayout={event => onLayout(event.nativeEvent.layout.y)}
+    >
       <View style={localStyles.levelHeader}>
         <View style={localStyles.levelTitleGroup}>
           <Text style={[localStyles.sectionTitle, { color: colors.text }]}>
@@ -830,6 +976,19 @@ const localStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
+  },
+  requiredToast: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: -2,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  requiredToastText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   slotHeader: {
     alignItems: 'center',

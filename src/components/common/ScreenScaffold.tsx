@@ -4,29 +4,36 @@ import { useAppTheme } from '../../theme/ThemeContext';
 
 export function ScreenScaffold({
   eyebrow,
+  headerTitle,
   title,
   body,
   children,
   onOpenSettings,
   hideHeader = false,
+  scrollRef,
 }: {
   eyebrow: string;
+  headerTitle?: string;
   title: string;
   body: string;
   children: React.ReactNode;
   onOpenSettings?: () => void;
   hideHeader?: boolean;
+  scrollRef?: React.RefObject<ScrollView | null>;
 }) {
   const { styles } = useAppTheme();
 
   return (
     <ScrollView
+      ref={scrollRef}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
       {!hideHeader && (
         <View style={styles.topBar}>
-          <Text style={styles.eyebrow}>{eyebrow}</Text>
+          <Text style={headerTitle ? styles.sectionTitle : styles.eyebrow}>
+            {headerTitle ?? eyebrow}
+          </Text>
           <Pressable
             accessibilityRole="button"
             onPress={onOpenSettings}
@@ -40,8 +47,8 @@ export function ScreenScaffold({
           </Pressable>
         </View>
       )}
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.body}>{body}</Text>
+      {title ? <Text style={styles.title}>{title}</Text> : null}
+      {body ? <Text style={styles.body}>{body}</Text> : null}
       {children}
     </ScrollView>
   );

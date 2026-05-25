@@ -429,7 +429,7 @@ function AppContent() {
 
   return (
     <View style={styles.safeArea}>
-      {onboardingStepIndex !== null && (
+      {!hasCompletedOnboarding && onboardingStepIndex !== null && (
         <OnboardingProgressBar
           activeStepIndex={onboardingStepIndex}
           segmentColor={colors.primary}

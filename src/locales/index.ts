@@ -59,6 +59,7 @@ export const TRANSLATIONS: Record<
     addLabel: 'Add',
     continueWith: 'Continue with',
     continueLabel: 'Continue',
+    saveLabel: 'Done Recording!',
     appSingular: 'app',
     appPlural: 'apps',
     dashboard: 'Dashboard',
@@ -86,6 +87,7 @@ export const TRANSLATIONS: Record<
     stepThree: 'Step 3',
     manageVoiceNotesLabel: 'Manage Voice Notes',
     managePermissionsLabel: 'Manage Permissions',
+    voiceNotesTitle: 'Voice Notes',
     recordingsTitle: 'Record your voice notes.',
     recordingsBody:
       'These notes will play when you reach your app usage limits. They should be motivational or anything that would stop you from scrolling.',
@@ -109,6 +111,8 @@ export const TRANSLATIONS: Record<
     stopLabel: 'Stop',
     required: 'Required',
     optional: 'Optional',
+    requiredVoiceNoteAlert: 'Please record the required voice note.',
+    voiceNotesSavedAlert: 'Voice notes are saved.',
     minRecordingsAlert:
       'Please record at least one note for each level to proceed.',
     finishSetup: 'Finish setup',
@@ -183,6 +187,7 @@ export const TRANSLATIONS: Record<
     addLabel: 'شامل کریں',
     continueWith: 'جاری رکھیں',
     continueLabel: 'جاری رکھیں',
+    saveLabel: 'محفوظ کریں',
     appSingular: 'ایپ',
     appPlural: 'ایپس',
     dashboard: 'ڈیش بورڈ',
@@ -210,6 +215,7 @@ export const TRANSLATIONS: Record<
     stepThree: 'مرحلہ 3',
     manageVoiceNotesLabel: 'وائس نوٹس منظم کریں',
     managePermissionsLabel: 'اجازتیں منظم کریں',
+    voiceNotesTitle: 'وائس نوٹس',
     recordingsTitle: 'اپنی آواز ریکارڈ کریں۔',
     recordingsBody:
       'یہ آوازیں تب چلیں گی جب آپ اپنی ایپ کے استعمال کی حد تک پہنچ جائیں گے۔ یہ آپ کو اسکرولنگ روکنے میں مدد کریں گی۔',
@@ -233,6 +239,8 @@ export const TRANSLATIONS: Record<
     stopLabel: 'بند کریں',
     required: 'لازمی',
     optional: 'اختیاری',
+    requiredVoiceNoteAlert: 'براہ کرم لازمی وائس نوٹ ریکارڈ کریں۔',
+    voiceNotesSavedAlert: 'وائس نوٹس محفوظ ہو گئے ہیں۔',
     minRecordingsAlert:
       'براہ کرم آگے بڑھنے کے لیے ہر لیول کے لیے کم از کم ایک آواز ریکارڈ کریں۔',
     finishSetup: 'سیٹ اپ مکمل کریں',
