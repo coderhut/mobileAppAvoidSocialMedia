@@ -36,7 +36,18 @@ type SettingsContextType = {
   hasCompletedOnboarding: boolean;
   setHasCompletedOnboarding: (completed: boolean) => void;
   voiceNotes: Record<number, Record<number, string>>;
-  saveVoiceNote: (level: number, index: number, filePath: string) => void;
+  voiceNoteDurations: Record<number, Record<number, number>>;
+  saveVoiceNote: (
+    level: number,
+    index: number,
+    filePath: string,
+    durationMs?: number,
+  ) => void;
+  saveVoiceNoteDuration: (
+    level: number,
+    index: number,
+    durationMs: number,
+  ) => void;
   deleteVoiceNote: (level: number, index: number) => void;
   globalDailyLimit: number;
   setGlobalDailyLimit: (limit: number) => void;
@@ -67,6 +78,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     3: {},
   });
   const voiceNotesRef = useRef(voiceNotes);
+  const [voiceNoteDurations, setVoiceNoteDurationsState] = useState<
+    Record<number, Record<number, number>>
+  >({
+    1: {},
+    2: {},
+    3: {},
+  });
+  const voiceNoteDurationsRef = useRef(voiceNoteDurations);
   const [globalDailyLimit, setGlobalDailyLimitState] = useState<number>(30); // Default 30 mins
 
   useEffect(() => {
@@ -113,6 +132,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        if (preferences.voiceNoteDurations) {
+          try {
+            const parsed = JSON.parse(preferences.voiceNoteDurations);
+            const normalized = normalizeVoiceNoteDurations(parsed);
+            voiceNoteDurationsRef.current = normalized;
+            setVoiceNoteDurationsState(normalized);
+          } catch (e) {
+            console.error('Failed to parse voice note durations', e);
+          }
+        }
+
         setDailyLimitSettings(
           parseDailyLimitSettings(preferences.dailyLimitSettings),
         );
@@ -126,6 +156,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     voiceNotesRef.current = voiceNotes;
   }, [voiceNotes]);
+
+  useEffect(() => {
+    voiceNoteDurationsRef.current = voiceNoteDurations;
+  }, [voiceNoteDurations]);
 
   const setSelectedPackageNames = useCallback((nextPackageNames: string[]) => {
     setSelectedPackageNamesState(nextPackageNames);
@@ -183,8 +217,29 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const saveVoiceNoteDuration = useCallback(
+    (level: number, index: number, durationMs: number) => {
+      setVoiceNoteDurationsState(current => {
+        const levelDurations = { ...(current[level] || {}) };
+        levelDurations[index] = durationMs;
+
+        const nextDurations = {
+          ...current,
+          [level]: levelDurations,
+        };
+
+        AppPreferencesModule?.setVoiceNoteDurations(
+          JSON.stringify(nextDurations),
+        ).catch(() => undefined);
+        voiceNoteDurationsRef.current = nextDurations;
+        return nextDurations;
+      });
+    },
+    [],
+  );
+
   const saveVoiceNote = useCallback(
-    (level: number, index: number, filePath: string) => {
+    (level: number, index: number, filePath: string, durationMs?: number) => {
       setVoiceNotesState(current => {
         const levelNotes = { ...(current[level] || {}) };
         levelNotes[index] = filePath;
@@ -198,8 +253,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         voiceNotesRef.current = nextNotes;
         return nextNotes;
       });
+
+      if (durationMs !== undefined && durationMs > 0) {
+        saveVoiceNoteDuration(level, index, durationMs);
+      }
     },
-    [],
+    [saveVoiceNoteDuration],
   );
 
   const deleteVoiceNote = useCallback(async (level: number, index: number) => {
@@ -218,6 +277,22 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       );
       voiceNotesRef.current = nextNotes;
       return nextNotes;
+    });
+
+    setVoiceNoteDurationsState(current => {
+      const levelDurations = { ...(current[level] || {}) };
+      delete levelDurations[index];
+
+      const nextDurations = {
+        ...current,
+        [level]: levelDurations,
+      };
+
+      AppPreferencesModule?.setVoiceNoteDurations(
+        JSON.stringify(nextDurations),
+      ).catch(() => undefined);
+      voiceNoteDurationsRef.current = nextDurations;
+      return nextDurations;
     });
 
     if (filePathToDelete) {
@@ -252,7 +327,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     hasCompletedOnboarding,
     setHasCompletedOnboarding,
     voiceNotes,
+    voiceNoteDurations,
     saveVoiceNote,
+    saveVoiceNoteDuration,
     deleteVoiceNote,
     globalDailyLimit,
     setGlobalDailyLimit,
@@ -310,6 +387,45 @@ function normalizeVoiceNotes(
         },
       );
     }
+  });
+
+  return normalized;
+}
+
+function normalizeVoiceNoteDurations(
+  value: unknown,
+): Record<number, Record<number, number>> {
+  const normalized: Record<number, Record<number, number>> = {
+    1: {},
+    2: {},
+    3: {},
+  };
+
+  if (!value || typeof value !== 'object') {
+    return normalized;
+  }
+
+  [1, 2, 3].forEach(level => {
+    const levelValue =
+      (value as Record<string, unknown>)[String(level)] ??
+      (value as Record<number, unknown>)[level];
+
+    if (!levelValue || typeof levelValue !== 'object') {
+      return;
+    }
+
+    Object.entries(levelValue as Record<string, unknown>).forEach(
+      ([index, durationMs]) => {
+        const numericIndex = Number(index);
+        if (
+          Number.isInteger(numericIndex) &&
+          typeof durationMs === 'number' &&
+          durationMs > 0
+        ) {
+          normalized[level][numericIndex] = durationMs;
+        }
+      },
+    );
   });
 
   return normalized;

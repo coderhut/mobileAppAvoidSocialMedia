@@ -22,6 +22,7 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
         putString("language", preferences.getString("language", "en"))
         putString("dailyLimitSettings", preferences.getString("dailyLimitSettings", "{}"))
         putString("voiceNotes", preferences.getString("voiceNotes", "{}"))
+        putString("voiceNoteDurations", preferences.getString("voiceNoteDurations", "{}"))
         putInt("globalDailyLimit", preferences.getInt("globalDailyLimit", 0))
         putBoolean("hasCompletedOnboarding", preferences.getBoolean("hasCompletedOnboarding", false))
         putArray(
@@ -73,6 +74,11 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
   @ReactMethod
   fun setVoiceNotes(voiceNotesJson: String, promise: Promise) {
     saveString("voiceNotes", voiceNotesJson, promise)
+  }
+
+  @ReactMethod
+  fun setVoiceNoteDurations(durationsJson: String, promise: Promise) {
+    saveString("voiceNoteDurations", durationsJson, promise)
   }
 
   @ReactMethod

@@ -93,6 +93,15 @@ export type TranslationKey =
   | 'holdToRecord'
   | 'releaseToStop'
   | 'startRecordingLabel'
+  | 'doneLabel'
+  | 'pendingLabel'
+  | 'playingLabel'
+  | 'readyLabel'
+  | 'pausedLabel'
+  | 'playLabel'
+  | 'pauseLabel'
+  | 'resumeLabel'
+  | 'stopLabel'
   | 'required'
   | 'optional'
   | 'minRecordingsAlert'
@@ -160,6 +169,7 @@ export type AppPreferences = {
   selectedPackageNames?: string[];
   dailyLimitSettings?: string;
   voiceNotes?: string; // JSON string of Record<string, string[]> (level -> filePaths)
+  voiceNoteDurations?: string; // JSON string of Record<level, Record<index, durationMs>>
   globalDailyLimit?: number; // In minutes
   hasCompletedOnboarding?: boolean;
 };
@@ -171,6 +181,7 @@ export type AppPreferencesBridge = {
   setSelectedPackageNames: (packageNames: string[]) => Promise<void>;
   setDailyLimitSettings: (settingsJson: string) => Promise<void>;
   setVoiceNotes: (voiceNotesJson: string) => Promise<void>;
+  setVoiceNoteDurations: (durationsJson: string) => Promise<void>;
   setGlobalDailyLimit: (limitMinutes: number) => Promise<void>;
   setHasCompletedOnboarding: (completed: boolean) => Promise<void>;
 };

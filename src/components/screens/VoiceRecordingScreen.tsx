@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
   Modal,
-  Platform,
   PermissionsAndroid,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -17,14 +17,19 @@ import AudioRecorderPlayer, {
   AVEncodingOption,
 } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
-import { useAppTheme } from '../../theme/ThemeContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useAppTheme } from '../../theme/ThemeContext';
+import type { ThemeColors, ThemeMode, TranslationKey } from '../../types';
 import { PrimaryButton } from '../common/PrimaryButton';
 import { SecondaryButton } from '../common/SecondaryButton';
 import { ScreenScaffold } from '../common/ScreenScaffold';
 import { WaveformVisualizer } from '../common/WaveformVisualizer';
 
-const MAX_DURATION_SEC = 15;
+const MAX_DURATION_SEC = 30;
+const WAVEFORM_BARS = [
+  8, 16, 11, 24, 18, 30, 20, 34, 15, 26, 32, 18, 28, 12, 20, 26, 16, 22, 12, 18,
+  10, 14, 12, 16,
+];
 
 export function VoiceRecordingScreen({
   onContinue,
@@ -37,8 +42,14 @@ export function VoiceRecordingScreen({
   onOpenSettings?: () => void;
   hideHeader?: boolean;
 }) {
-  const { colors, t } = useAppTheme();
-  const { voiceNotes, saveVoiceNote, deleteVoiceNote } = useSettings();
+  const { colors, mode, t } = useAppTheme();
+  const {
+    voiceNotes,
+    voiceNoteDurations,
+    saveVoiceNote,
+    saveVoiceNoteDuration,
+    deleteVoiceNote,
+  } = useSettings();
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordTime, setRecordTime] = useState('00:00');
@@ -54,10 +65,20 @@ export function VoiceRecordingScreen({
     level: number;
     index: number;
   } | null>(null);
+  const [playbackProgress, setPlaybackProgress] = useState<{
+    currentMs: number;
+    durationMs: number;
+    level: number;
+    index: number;
+  } | null>(null);
+  const [recordingDurations, setRecordingDurations] = useState<
+    Record<string, number>
+  >({});
   const [isPlaybackPaused, setIsPlaybackPaused] = useState(false);
   const isRecordingRef = useRef(false);
   const isStartingRef = useRef(false);
   const activeSlotRef = useRef<{ level: number; index: number } | null>(null);
+  const recordDurationMsRef = useRef(0);
   const isStoppingRef = useRef(false);
 
   const audioRecorderPlayer = useRef(new AudioRecorderPlayer()).current;
@@ -110,6 +131,7 @@ export function VoiceRecordingScreen({
       setIsRecording(true);
       setIsPaused(false);
       setRecordTime('00:00');
+      recordDurationMsRef.current = 0;
 
       const path = Platform.select({
         android: `${RNFS.DocumentDirectoryPath}/voice_level${level}_${index}.mp4`,
@@ -127,12 +149,8 @@ export function VoiceRecordingScreen({
       await audioRecorderPlayer.startRecorder(path, audioSet);
       isRecordingRef.current = true;
       audioRecorderPlayer.addRecordBackListener(e => {
-        const seconds = Math.floor(e.currentPosition / 1000);
-        const mm = Math.floor(seconds / 60)
-          .toString()
-          .padStart(2, '0');
-        const ss = (seconds % 60).toString().padStart(2, '0');
-        setRecordTime(`${mm}:${ss}`);
+        recordDurationMsRef.current = e.currentPosition;
+        setRecordTime(formatPlaybackTime(e.currentPosition));
 
         if (e.currentPosition >= MAX_DURATION_SEC * 1000) {
           onStopRecord();
@@ -182,12 +200,18 @@ export function VoiceRecordingScreen({
       isRecordingRef.current = false;
 
       const slot = activeSlotRef.current;
+      const recordedDurationMs = recordDurationMsRef.current;
       activeSlotRef.current = null;
       setActiveSlot(null);
       setRecordTime('00:00');
+      recordDurationMsRef.current = 0;
 
       if (slot) {
-        saveVoiceNote(slot.level, slot.index, result);
+        setRecordingDurations(current => ({
+          ...current,
+          [getSlotKey(slot.level, slot.index)]: recordedDurationMs,
+        }));
+        saveVoiceNote(slot.level, slot.index, result, recordedDurationMs);
       }
     } catch (err) {
       console.error('Failed to stop recorder', err);
@@ -197,28 +221,60 @@ export function VoiceRecordingScreen({
       activeSlotRef.current = null;
       setActiveSlot(null);
       setRecordTime('00:00');
+      recordDurationMsRef.current = 0;
     } finally {
       isStoppingRef.current = false;
     }
   };
 
   const onPlayBack = async (path: string, level: number, index: number) => {
+    const slotKey = getSlotKey(level, index);
+    let hasSavedDuration = Boolean(
+      recordingDurations[slotKey] || voiceNoteDurations[level]?.[index],
+    );
+
     try {
       audioRecorderPlayer.removePlayBackListener();
       await audioRecorderPlayer.stopPlayer().catch(() => undefined);
       await audioRecorderPlayer.startPlayer(path);
       setPlayingSlot({ level, index });
+      setPlaybackProgress({ currentMs: 0, durationMs: 0, level, index });
       setIsPlaybackPaused(false);
       audioRecorderPlayer.addPlayBackListener(e => {
+        setPlaybackProgress({
+          currentMs: e.currentPosition,
+          durationMs: e.duration,
+          level,
+          index,
+        });
+
+        if (e.duration > 0) {
+          setRecordingDurations(current => ({
+            ...current,
+            [slotKey]: e.duration,
+          }));
+          if (!hasSavedDuration) {
+            saveVoiceNoteDuration(level, index, e.duration);
+            hasSavedDuration = true;
+          }
+        }
+
         if (e.duration > 0 && e.currentPosition >= e.duration) {
           audioRecorderPlayer.removePlayBackListener();
           audioRecorderPlayer.stopPlayer();
           setPlayingSlot(null);
           setIsPlaybackPaused(false);
+          setPlaybackProgress({
+            currentMs: 0,
+            durationMs: e.duration,
+            level,
+            index,
+          });
         }
       });
     } catch (err) {
       setPlayingSlot(null);
+      setPlaybackProgress(null);
       setIsPlaybackPaused(false);
       console.error('Failed to play', err);
     }
@@ -250,6 +306,7 @@ export function VoiceRecordingScreen({
       console.error('Failed to stop playback', err);
     } finally {
       setPlayingSlot(null);
+      setPlaybackProgress(null);
       setIsPlaybackPaused(false);
     }
   };
@@ -278,20 +335,46 @@ export function VoiceRecordingScreen({
       startingSlot?.level === level && startingSlot?.index === index;
     const isPlaying =
       playingSlot?.level === level && playingSlot?.index === index;
+    const slotKey = getSlotKey(level, index);
+    const slotProgress =
+      playbackProgress?.level === level && playbackProgress.index === index
+        ? playbackProgress
+        : null;
+    const durationMs =
+      slotProgress?.durationMs ||
+      recordingDurations[slotKey] ||
+      voiceNoteDurations[level]?.[index] ||
+      0;
+    const currentMs = slotProgress?.currentMs || 0;
+    const progressRatio = durationMs > 0 ? currentMs / durationMs : 0;
+    const slotStatus = isPlaying
+      ? isPlaybackPaused
+        ? t('pausedLabel')
+        : t('playingLabel')
+      : t('readyLabel');
+    const slotStatusColor =
+      isPlaying && !isPlaybackPaused ? colors.success : colors.subtleText;
 
     return (
       <View
         key={`${level}-${index}`}
         style={[
           localStyles.slotCard,
-          { backgroundColor: colors.surface, borderColor: colors.border },
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            shadowColor: mode === 'dark' ? '#000000' : '#0F172A',
+          },
         ]}
       >
         <View style={localStyles.slotHeader}>
           <View
             style={[
               localStyles.slotNumber,
-              { backgroundColor: colors.surfaceAlt },
+              {
+                backgroundColor:
+                  mode === 'dark' ? '#23324A' : colors.noticeBackground,
+              },
             ]}
           >
             <Text
@@ -308,83 +391,155 @@ export function VoiceRecordingScreen({
               onPress={() => deleteVoiceNote(level, index)}
               style={localStyles.deleteIcon}
             >
-              <Text style={{ color: '#EF4444', fontWeight: '800' }}>✕</Text>
+              <Text style={localStyles.deleteIconText}>⌫</Text>
             </Pressable>
           )}
         </View>
 
-        <View style={localStyles.slotActions}>
-          {isRecorded ? (
-            isPlaying ? (
-              <View style={localStyles.playbackControls}>
-                <Pressable
-                  onPress={isPlaybackPaused ? onResumeBack : onPauseBack}
-                  style={[
-                    localStyles.playbackButton,
-                    { backgroundColor: colors.primary + '15' },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      localStyles.playButtonText,
-                      { color: colors.primary },
-                    ]}
-                  >
-                    {isPlaybackPaused ? 'Resume' : 'Pause'}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={onStopBack}
-                  style={[
-                    localStyles.playbackButton,
-                    { backgroundColor: '#EF444415' },
-                  ]}
-                >
-                  <Text
-                    style={[localStyles.playButtonText, { color: '#EF4444' }]}
-                  >
-                    Stop
-                  </Text>
-                </Pressable>
-              </View>
-            ) : (
+        {isRecorded ? (
+          <>
+            <View
+              style={[
+                localStyles.waveformPanel,
+                {
+                  backgroundColor:
+                    mode === 'dark' ? '#4B5563' : colors.surfaceAlt,
+                  borderColor: mode === 'dark' ? '#7B8492' : colors.border,
+                },
+              ]}
+            >
               <Pressable
-                onPress={() => onPlayBack(path, level, index)}
+                onPress={
+                  isPlaying
+                    ? isPlaybackPaused
+                      ? onResumeBack
+                      : onPauseBack
+                    : () => onPlayBack(path, level, index)
+                }
                 style={[
-                  localStyles.playButton,
-                  { backgroundColor: colors.primary + '15' },
+                  localStyles.roundActionButton,
+                  {
+                    backgroundColor:
+                      mode === 'dark' ? '#38BDF8' : colors.primary,
+                  },
+                ]}
+              >
+                <Text style={localStyles.roundActionText}>
+                  {isPlaying && !isPlaybackPaused ? 'Ⅱ' : '▷'}
+                </Text>
+              </Pressable>
+              <WaveformStrip
+                colors={colors}
+                mode={mode}
+                progressRatio={progressRatio}
+              />
+              <View style={localStyles.timeGroup}>
+                <Text
+                  style={[
+                    localStyles.elapsedText,
+                    { color: mode === 'dark' ? '#FFFFFF' : colors.text },
+                  ]}
+                >
+                  {formatPlaybackTime(currentMs)}
+                </Text>
+                <Text
+                  style={[localStyles.totalText, { color: colors.subtleText }]}
+                >
+                  {formatPlaybackTime(durationMs)}
+                </Text>
+              </View>
+            </View>
+
+            {/*
+            <View style={localStyles.playbackControls}>
+              <Pressable
+                onPress={
+                  isPlaying
+                    ? isPlaybackPaused
+                      ? onResumeBack
+                      : onPauseBack
+                    : () => onPlayBack(path, level, index)
+                }
+                style={[
+                  localStyles.compactActionButton,
+                  { borderColor: colors.border },
                 ]}
               >
                 <Text
                   style={[
-                    localStyles.playButtonText,
-                    { color: colors.primary },
+                    localStyles.compactActionText,
+                    { color: colors.text },
                   ]}
                 >
-                  Play Recording
+                  {isPlaying
+                    ? isPlaybackPaused
+                      ? t('resumeLabel')
+                      : t('pauseLabel')
+                    : t('playLabel')}
                 </Text>
               </Pressable>
-            )
-          ) : (
-            <Pressable
-              disabled={!!startingSlot}
-              onPress={() => onStartRecord(level, index)}
-              style={[
-                localStyles.recordButton,
-                { backgroundColor: colors.primary },
-                !!startingSlot && !isStarting && localStyles.disabledButton,
-              ]}
-            >
-              {isStarting ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={localStyles.recordButtonText}>
+              <Pressable
+                disabled={!isPlaying}
+                onPress={onStopBack}
+                style={[
+                  localStyles.compactActionButton,
+                  { borderColor: colors.border },
+                  !isPlaying && localStyles.disabledButton,
+                ]}
+              >
+                <Text
+                  style={[
+                    localStyles.compactActionText,
+                    { color: colors.mutedText },
+                  ]}
+                >
+                  {t('stopLabel')}
+                </Text>
+              </Pressable>
+
+              <View style={localStyles.statusGroup}>
+                <View
+                  style={[
+                    localStyles.statusDot,
+                    { backgroundColor: slotStatusColor },
+                  ]}
+                />
+                <Text
+                  style={[localStyles.statusText, { color: slotStatusColor }]}
+                >
+                  {slotStatus}
+                </Text>
+              </View>
+            </View>
+            */}
+          </>
+        ) : (
+          <Pressable
+            disabled={!!startingSlot}
+            onPress={() => onStartRecord(level, index)}
+            style={[
+              localStyles.recordButton,
+              {
+                backgroundColor: mode === 'dark' ? '#172132' : '#FFFFFF',
+                borderColor: mode === 'dark' ? '#263A57' : colors.border,
+              },
+              !!startingSlot && !isStarting && localStyles.disabledButton,
+            ]}
+          >
+            {isStarting ? (
+              <ActivityIndicator color="#EF4444" size="small" />
+            ) : (
+              <>
+                <View style={localStyles.recordDot} />
+                <Text
+                  style={[localStyles.recordButtonText, { color: colors.text }]}
+                >
                   {t('startRecordingLabel')}
                 </Text>
-              )}
-            </Pressable>
-          )}
-        </View>
+              </>
+            )}
+          </Pressable>
+        )}
       </View>
     );
   };
@@ -397,12 +552,17 @@ export function VoiceRecordingScreen({
       onOpenSettings={onOpenSettings}
       hideHeader={hideHeader}
     >
+      <View style={[localStyles.divider, { backgroundColor: colors.border }]} />
+
       <LevelSection
         title={t('level1Title')}
         desc={t('level1Desc')}
         level={1}
         renderSlot={renderSlot}
         colors={colors}
+        complete={isLevelComplete(1)}
+        mode={mode}
+        t={t}
       />
 
       <LevelSection
@@ -411,6 +571,9 @@ export function VoiceRecordingScreen({
         level={2}
         renderSlot={renderSlot}
         colors={colors}
+        complete={isLevelComplete(2)}
+        mode={mode}
+        t={t}
       />
 
       <LevelSection
@@ -419,6 +582,9 @@ export function VoiceRecordingScreen({
         level={3}
         renderSlot={renderSlot}
         colors={colors}
+        complete={isLevelComplete(3)}
+        mode={mode}
+        t={t}
       />
 
       <Modal visible={isRecording} transparent={false} animationType="fade">
@@ -447,7 +613,9 @@ export function VoiceRecordingScreen({
                   { backgroundColor: colors.success },
                 ]}
               >
-                <Text style={localStyles.controlBtnText}>Resume</Text>
+                <Text style={localStyles.controlBtnText}>
+                  {t('resumeLabel')}
+                </Text>
               </Pressable>
             ) : (
               <Pressable
@@ -460,7 +628,7 @@ export function VoiceRecordingScreen({
                 <Text
                   style={[localStyles.controlBtnText, { color: colors.text }]}
                 >
-                  Pause
+                  {t('pauseLabel')}
                 </Text>
               </Pressable>
             )}
@@ -475,7 +643,7 @@ export function VoiceRecordingScreen({
         </View>
       </Modal>
 
-      <View style={{ marginTop: 20, marginBottom: 20 }}>
+      <View style={localStyles.footer}>
         <View style={localStyles.buttonRow}>
           <View style={localStyles.buttonCell}>
             <SecondaryButton label="Go Back" onPress={onBack} />
@@ -493,15 +661,68 @@ export function VoiceRecordingScreen({
   );
 }
 
-function LevelSection({ title, desc, level, renderSlot, colors }: any) {
+function LevelSection({
+  title,
+  desc,
+  level,
+  renderSlot,
+  colors,
+  complete,
+  mode,
+  t,
+}: {
+  title: string;
+  desc: string;
+  level: number;
+  renderSlot: (level: number, index: number) => React.ReactNode;
+  colors: ThemeColors;
+  complete: boolean;
+  mode: ThemeMode;
+  t: (key: TranslationKey) => string;
+}) {
   return (
     <View style={localStyles.levelSection}>
-      <Text style={[localStyles.sectionTitle, { color: colors.text }]}>
-        {title}
-      </Text>
-      <Text style={[localStyles.sectionDesc, { color: colors.mutedText }]}>
-        {desc}
-      </Text>
+      <View style={localStyles.levelHeader}>
+        <View style={localStyles.levelTitleGroup}>
+          <Text style={[localStyles.sectionTitle, { color: colors.text }]}>
+            {title}
+          </Text>
+          <Text style={[localStyles.sectionDesc, { color: colors.mutedText }]}>
+            {desc}
+          </Text>
+        </View>
+        <View
+          style={[
+            localStyles.levelStatusPill,
+            {
+              backgroundColor: complete
+                ? mode === 'dark'
+                  ? '#063E34'
+                  : '#DDFBEF'
+                : mode === 'dark'
+                ? '#263247'
+                : '#EFEFEF',
+            },
+          ]}
+        >
+          <View
+            style={[
+              localStyles.statusDot,
+              {
+                backgroundColor: complete ? colors.success : colors.subtleText,
+              },
+            ]}
+          />
+          <Text
+            style={[
+              localStyles.levelStatusText,
+              { color: complete ? colors.success : colors.subtleText },
+            ]}
+          >
+            {complete ? t('doneLabel') : t('pendingLabel')}
+          </Text>
+        </View>
+      </View>
       <View style={localStyles.slotsList}>
         {[0, 1, 2].map(i => renderSlot(level, i))}
       </View>
@@ -509,96 +730,249 @@ function LevelSection({ title, desc, level, renderSlot, colors }: any) {
   );
 }
 
+function WaveformStrip({
+  colors,
+  mode,
+  progressRatio,
+}: {
+  colors: ThemeColors;
+  mode: ThemeMode;
+  progressRatio: number;
+}) {
+  const activeBars = Math.round(
+    Math.max(0, Math.min(1, progressRatio)) * WAVEFORM_BARS.length,
+  );
+
+  return (
+    <View style={localStyles.waveform}>
+      {WAVEFORM_BARS.map((height, index) => (
+        <View
+          key={`${height}-${index}`}
+          style={[
+            localStyles.waveformBar,
+            {
+              height,
+              backgroundColor:
+                index < activeBars
+                  ? mode === 'dark'
+                    ? '#38BDF8'
+                    : colors.primary
+                  : mode === 'dark'
+                  ? '#24344F'
+                  : '#E5E7EB',
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function getSlotKey(level: number, index: number) {
+  return `${level}-${index}`;
+}
+
+function formatPlaybackTime(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
 const localStyles = StyleSheet.create({
+  divider: {
+    height: 1,
+    marginBottom: 36,
+  },
   levelSection: {
     marginBottom: 40,
   },
+  levelHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  levelTitleGroup: {
+    flex: 1,
+    paddingRight: 12,
+  },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
     marginBottom: 4,
   },
   sectionDesc: {
-    fontSize: 14,
-    marginBottom: 20,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  levelStatusPill: {
+    alignItems: 'center',
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 5,
+    marginTop: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  levelStatusText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   slotsList: {
     gap: 12,
   },
   slotCard: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 22,
     borderWidth: 1,
+    elevation: 2,
+    padding: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
   slotHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    flexDirection: 'row',
+    marginBottom: 14,
   },
   slotNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
     alignItems: 'center',
+    borderRadius: 12,
+    height: 24,
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
+    width: 24,
   },
   slotNumberText: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '900',
   },
   slotLabel: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   deleteIcon: {
-    padding: 8,
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    height: 24,
+    justifyContent: 'center',
+    width: 24,
   },
-  slotActions: {
-    width: '100%',
+  deleteIconText: {
+    color: '#EF4444',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  waveformPanel: {
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    minHeight: 66,
+    paddingHorizontal: 12,
+  },
+  roundActionButton: {
+    alignItems: 'center',
+    borderRadius: 21,
+    height: 42,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 42,
+  },
+  roundActionText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  waveform: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 3,
+    height: 42,
+  },
+  waveformBar: {
+    borderRadius: 2,
+    width: 3,
+  },
+  timeGroup: {
+    alignItems: 'flex-end',
+    marginLeft: 10,
+  },
+  elapsedText: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  totalText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  playbackControls: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  compactActionButton: {
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 34,
+    minWidth: 80,
+    paddingHorizontal: 12,
+  },
+  compactActionText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  statusGroup: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    marginLeft: 'auto',
+  },
+  statusDot: {
+    borderRadius: 3,
+    height: 6,
+    width: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   recordButton: {
-    minHeight: 46,
-    paddingVertical: 14,
-    borderRadius: 12,
     alignItems: 'center',
+    borderRadius: 18,
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: 10,
     justifyContent: 'center',
+    minHeight: 52,
+  },
+  recordDot: {
+    backgroundColor: '#EF4444',
+    borderRadius: 6,
+    height: 12,
+    width: 12,
+  },
+  recordButtonText: {
+    fontSize: 16,
+    fontWeight: '800',
   },
   disabledButton: {
     opacity: 0.45,
   },
-  recordButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  playButton: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  playbackControls: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  playbackButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  playButtonText: {
-    fontSize: 15,
-    fontWeight: '800',
+  footer: {
+    marginBottom: 20,
+    marginTop: 20,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -608,17 +982,17 @@ const localStyles = StyleSheet.create({
     flex: 1,
   },
   recordingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 2000,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    bottom: 0,
     height: '100%',
+    justifyContent: 'center',
+    left: 0,
+    padding: 24,
+    position: 'absolute',
+    right: 0,
+    top: 0,
     width: '100%',
+    zIndex: 2000,
   },
   overlayTitle: {
     fontSize: 20,
@@ -627,9 +1001,9 @@ const localStyles = StyleSheet.create({
   },
   recordTimer: {
     fontSize: 56,
+    fontVariant: ['tabular-nums'],
     fontWeight: '900',
     marginBottom: 40,
-    fontVariant: ['tabular-nums'],
   },
   controlGroup: {
     flexDirection: 'row',
@@ -637,11 +1011,11 @@ const localStyles = StyleSheet.create({
     width: '100%',
   },
   controlBtn: {
-    flex: 1,
-    paddingVertical: 18,
-    borderRadius: 16,
     alignItems: 'center',
+    borderRadius: 16,
+    flex: 1,
     justifyContent: 'center',
+    paddingVertical: 18,
   },
   controlBtnText: {
     color: '#FFFFFF',
