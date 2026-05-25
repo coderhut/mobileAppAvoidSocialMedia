@@ -176,6 +176,7 @@ export type AppPreferences = {
   language?: string;
   selectedPackageNames?: string[];
   dailyLimitSettings?: string;
+  dailyAnalytics?: string;
   voiceNotes?: string; // JSON string of Record<string, string[]> (level -> filePaths)
   voiceNoteDurations?: string; // JSON string of Record<level, Record<index, durationMs>>
   globalDailyLimit?: number; // In minutes

@@ -16,6 +16,7 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.avoidsocialmedia.BuildConfig
 import com.avoidsocialmedia.R
+import com.avoidsocialmedia.analytics.DailyAnalyticsStore
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -129,8 +130,10 @@ class WatchdogService : Service() {
         }
 
         // 3. Calculate Daily Progress
-        val totalUsageMs = calculateTotalUsage(selectedPackages)
+        val usageByPackage = calculateUsageByPackage(selectedPackages)
+        val totalUsageMs = usageByPackage.values.sum()
         val totalUsageMinutes = (totalUsageMs / 60000).toInt()
+        DailyAnalyticsStore.updateUsageSnapshot(this, usageByPackage, globalLimitMinutes)
 
         // 4. Escalation Logic
         if (totalUsageMinutes >= globalLimitMinutes) {
@@ -196,7 +199,10 @@ class WatchdogService : Service() {
 
         if (targetLevel > currentEscalationLevel && isUserInMonitoredApp) {
             currentEscalationLevel = targetLevel
-            if (targetLevel == 1) hasHitDailyLimitInitially = true
+            if (targetLevel == 1) {
+                hasHitDailyLimitInitially = true
+                DailyAnalyticsStore.recordLimitHit(this, currentForegroundPackage)
+            }
             
             triggerVoiceNote(targetLevel, voiceNotesJson)
         }
@@ -227,6 +233,7 @@ class WatchdogService : Service() {
             val filePath = availablePaths[randomIndex]
 
             Log.d("Watchdog", "Playing Level $level note: $filePath")
+            DailyAnalyticsStore.recordVoiceNoteIntervention(this, level, currentForegroundPackage)
             
             // Stop any existing sound/overlay before showing new one
             voiceNotePlayer.stop()
@@ -251,7 +258,7 @@ class WatchdogService : Service() {
         return stats?.maxByOrNull { it.lastTimeUsed }?.packageName
     }
 
-    private fun calculateTotalUsage(packageNames: Set<String>): Long {
+    private fun calculateUsageByPackage(packageNames: Set<String>): Map<String, Long> {
         val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val endTime = System.currentTimeMillis()
         val startTime = Calendar.getInstance().apply {
@@ -270,8 +277,7 @@ class WatchdogService : Service() {
         return stats
             .filter { it.totalTimeInForeground > 0 && packageNames.contains(it.packageName) }
             .groupBy { it.packageName }
-            .map { (_, packageStats) -> packageStats.sumOf { it.totalTimeInForeground } }
-            .sum()
+            .mapValues { (_, packageStats) -> packageStats.sumOf { it.totalTimeInForeground } }
     }
 
     private fun createNotification(content: String): Notification {

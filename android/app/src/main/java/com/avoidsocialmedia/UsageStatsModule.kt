@@ -15,12 +15,14 @@ import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import android.util.Base64
+import com.avoidsocialmedia.analytics.DailyAnalyticsStore
 import com.avoidsocialmedia.services.WatchdogService
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import org.json.JSONArray
 import java.io.ByteArrayOutputStream
 import java.util.Calendar
 
@@ -203,6 +205,20 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
         }
         .sortedByDescending { it.totalTimeMs }
 
+      val preferences =
+        reactContext.getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+      val selectedPackages = packageNamesToSet(preferences.getString("selectedPackageNames", "[]"))
+      val globalLimitMinutes = preferences.getInt("globalDailyLimit", 0)
+      val selectedUsageByPackage = mergedStats
+        .filter { selectedPackages.contains(it.packageName) }
+        .associate { it.packageName to it.totalTimeMs }
+
+      DailyAnalyticsStore.updateUsageSnapshot(
+        reactContext,
+        selectedUsageByPackage,
+        globalLimitMinutes,
+      )
+
       val response = Arguments.createArray()
       mergedStats.forEach { summary ->
         response.pushMap(Arguments.createMap().apply {
@@ -249,6 +265,14 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
       packageManager.getApplicationLabel(appInfo).toString()
     } catch (_: PackageManager.NameNotFoundException) {
       packageName
+    }
+  }
+
+  private fun packageNamesToSet(value: String?) = mutableSetOf<String>().apply {
+    val jsonArray = JSONArray(value ?: "[]")
+
+    for (index in 0 until jsonArray.length()) {
+      add(jsonArray.getString(index))
     }
   }
 

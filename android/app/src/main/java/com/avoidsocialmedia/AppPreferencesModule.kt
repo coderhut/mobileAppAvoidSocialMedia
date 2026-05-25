@@ -21,6 +21,7 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
         putString("themePreference", preferences.getString("themePreference", "system"))
         putString("language", preferences.getString("language", "en"))
         putString("dailyLimitSettings", preferences.getString("dailyLimitSettings", "{}"))
+        putString("dailyAnalytics", preferences.getString("dailyAnalytics", "{}"))
         putString("voiceNotes", preferences.getString("voiceNotes", "{}"))
         putString("voiceNoteDurations", preferences.getString("voiceNoteDurations", "{}"))
         putInt("globalDailyLimit", preferences.getInt("globalDailyLimit", 0))
