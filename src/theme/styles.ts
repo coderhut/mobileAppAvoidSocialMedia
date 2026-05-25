@@ -48,7 +48,7 @@ export function createThemedStyles(colors: ThemeColors) {
       justifyContent: 'flex-end',
     },
     modalBackdrop: {
-      backgroundColor: 'rgba(15, 23, 42, 0.6)',
+      backgroundColor: 'transparent',
       flex: 1,
     },
     settingsPanel: {

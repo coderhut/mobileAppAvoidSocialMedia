@@ -33,7 +33,7 @@ export function SettingsPanel({
     themePreference,
   } = useAppTheme();
 
-  const slideAnim = useRef(new Animated.Value(width)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
   const currentThemeLabel =
     themePreference === 'system'
       ? t('useDeviceSetting')
@@ -44,15 +44,16 @@ export function SettingsPanel({
 
   useEffect(() => {
     if (isVisible) {
+      slideAnim.setValue(0);
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 300,
+        duration: 120,
         useNativeDriver: true,
       }).start();
     } else {
       Animated.timing(slideAnim, {
         toValue: width,
-        duration: 250,
+        duration: 120,
         useNativeDriver: true,
       }).start();
     }
@@ -63,7 +64,7 @@ export function SettingsPanel({
     setIsLanguageSheetOpen(false);
     Animated.timing(slideAnim, {
       toValue: width,
-      duration: 250,
+      duration: 120,
       useNativeDriver: true,
     }).start(() => {
       onClose();
