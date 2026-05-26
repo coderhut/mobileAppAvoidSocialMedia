@@ -15,6 +15,7 @@ import type {
   ThemePreference,
 } from '../types';
 import {
+  clampLimitMinutes,
   normalizeDailyLimitSetting,
   parseDailyLimitSettings,
 } from '../utils/dailyLimits';
@@ -118,7 +119,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           preferences.globalDailyLimit !== undefined &&
           preferences.globalDailyLimit > 0
         ) {
-          setGlobalDailyLimitState(preferences.globalDailyLimit);
+          setGlobalDailyLimitState(
+            clampLimitMinutes(preferences.globalDailyLimit),
+          );
         }
 
         if (preferences.voiceNotes) {
@@ -309,8 +312,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setGlobalDailyLimit = useCallback((limit: number) => {
-    setGlobalDailyLimitState(limit);
-    AppPreferencesModule?.setGlobalDailyLimit(limit).catch(() => undefined);
+    const nextLimit = clampLimitMinutes(limit);
+    setGlobalDailyLimitState(nextLimit);
+    AppPreferencesModule?.setGlobalDailyLimit(nextLimit).catch(() => undefined);
   }, []);
 
   const value = {

@@ -19,7 +19,11 @@ import com.avoidsocialmedia.R
 import com.avoidsocialmedia.analytics.DailyAnalyticsStore
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 class WatchdogService : Service() {
@@ -27,6 +31,8 @@ class WatchdogService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
     private val pollingIntervalMs = 15000L // 15 seconds for more responsive session detection
+    private val minimumDailyLimitMinutes = 15
+    private val urgentRepeatIntervalMs = 5 * 60 * 1000L
     private lateinit var voiceNotePlayer: VoiceNotePlayer
     private lateinit var interventionOverlay: InterventionOverlay
 
@@ -37,6 +43,7 @@ class WatchdogService : Service() {
     private var lastInterventionTimeMs: Long = 0
     private var currentEscalationLevel = 0 // 0 = none, 1 = gentle, 2 = firm, 3 = urgent
     private var hasHitDailyLimitInitially = false
+    private var stateDateKey = todayKey()
 
     companion object {
         const val CHANNEL_ID = "WatchdogServiceChannel"
@@ -96,12 +103,15 @@ class WatchdogService : Service() {
     }
 
     private fun checkUsage() {
+        resetDailyStateIfNeeded()
+
         val prefs = getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
         val selectedPackageJson = prefs.getString("selectedPackageNames", "[]") ?: "[]"
-        val globalLimitMinutes = prefs.getInt("globalDailyLimit", 0)
+        val savedGlobalLimitMinutes = prefs.getInt("globalDailyLimit", 0)
+        val globalLimitMinutes = savedGlobalLimitMinutes.coerceAtLeast(minimumDailyLimitMinutes)
         val voiceNotesJson = prefs.getString("voiceNotes", "{}") ?: "{}"
         
-        if (globalLimitMinutes <= 0) return
+        if (savedGlobalLimitMinutes <= 0) return
 
         val selectedPackages = mutableSetOf<String>()
         val jsonArray = JSONArray(selectedPackageJson)
@@ -113,6 +123,7 @@ class WatchdogService : Service() {
 
         // 1. Detect if user is in a monitored app
         val activePackage = getActiveForegroundPackage()
+        currentForegroundPackage = activePackage
         val wasInMonitoredApp = isUserInMonitoredApp
         isUserInMonitoredApp = selectedPackages.contains(activePackage)
 
@@ -126,6 +137,7 @@ class WatchdogService : Service() {
             // Left the distracting app
             voiceNotePlayer.stop()
             interventionOverlay.hide()
+            sessionStartTimeMs = 0
             Log.d("Watchdog", "Monitored session ended")
         }
 
@@ -163,17 +175,21 @@ class WatchdogService : Service() {
             }
         } else {
             val sessionElapsedMin = ((System.currentTimeMillis() - sessionStartTimeMs) / 60000).toInt()
+            val thresholds = getReEntryThresholds(limitMin)
             when (currentEscalationLevel) {
-                0 -> 10 - sessionElapsedMin
-                1 -> 15 - sessionElapsedMin
-                2 -> 18 - sessionElapsedMin
-                else -> 0
+                0 -> thresholds.levelOneMinutes - sessionElapsedMin
+                1 -> thresholds.levelTwoMinutes - sessionElapsedMin
+                2 -> thresholds.levelThreeMinutes - sessionElapsedMin
+                else -> repeatLevelThreeMinutesRemaining()
             }
         }.coerceAtLeast(0)
     }
 
     private fun handleEscalation(currentMin: Int, limitMin: Int, voiceNotesJson: String) {
         val currentTime = System.currentTimeMillis()
+        if (isUserInMonitoredApp && sessionStartTimeMs == 0L) {
+            sessionStartTimeMs = currentTime
+        }
         val sessionElapsedMin = (currentTime - sessionStartTimeMs) / 60000
 
         // Determine Level
@@ -188,10 +204,11 @@ class WatchdogService : Service() {
             }
             else -> {
                 // Scenario 2: Subsequent re-entry
+                val thresholds = getReEntryThresholds(limitMin)
                 when {
-                    sessionElapsedMin >= 18 -> 3 // Entry + 18 mins
-                    sessionElapsedMin >= 15 -> 2 // Entry + 15 mins
-                    sessionElapsedMin >= 10 -> 1 // Entry + 10 mins
+                    sessionElapsedMin >= thresholds.levelThreeMinutes -> 3
+                    sessionElapsedMin >= thresholds.levelTwoMinutes -> 2
+                    sessionElapsedMin >= thresholds.levelOneMinutes -> 1
                     else -> 0
                 }
             }
@@ -199,19 +216,29 @@ class WatchdogService : Service() {
 
         if (targetLevel > currentEscalationLevel && isUserInMonitoredApp) {
             currentEscalationLevel = targetLevel
-            if (targetLevel == 1) {
+            if (!hasHitDailyLimitInitially) {
                 hasHitDailyLimitInitially = true
                 DailyAnalyticsStore.recordLimitHit(this, currentForegroundPackage)
             }
             
-            triggerVoiceNote(targetLevel, voiceNotesJson)
+            if (triggerVoiceNote(targetLevel, voiceNotesJson)) {
+                lastInterventionTimeMs = currentTime
+            }
+        } else if (
+            currentEscalationLevel >= 3 &&
+            isUserInMonitoredApp &&
+            currentTime - lastInterventionTimeMs >= urgentRepeatIntervalMs
+        ) {
+            if (triggerVoiceNote(3, voiceNotesJson)) {
+                lastInterventionTimeMs = currentTime
+            }
         }
     }
 
-    private fun triggerVoiceNote(level: Int, voiceNotesJson: String) {
+    private fun triggerVoiceNote(level: Int, voiceNotesJson: String): Boolean {
         try {
             val json = JSONObject(voiceNotesJson)
-            val levelData = json.opt(level.toString()) ?: return
+            val levelData = json.opt(level.toString()) ?: return false
             
             val availablePaths = mutableListOf<String>()
             
@@ -226,27 +253,26 @@ class WatchdogService : Service() {
                 }
             }
 
-            if (availablePaths.isEmpty()) return
+            if (availablePaths.isEmpty()) return false
 
             // Pick a random note from the level
             val randomIndex = Random.nextInt(availablePaths.size)
             val filePath = availablePaths[randomIndex]
 
             Log.d("Watchdog", "Playing Level $level note: $filePath")
-            DailyAnalyticsStore.recordVoiceNoteIntervention(this, level, currentForegroundPackage)
             
-            // Stop any existing sound/overlay before showing new one
             voiceNotePlayer.stop()
-            interventionOverlay.hide()
-
-            interventionOverlay.show(level, currentForegroundPackage) {
+            interventionOverlay.replace(level, currentForegroundPackage) {
                 voiceNotePlayer.stop()
             }
             voiceNotePlayer.play(filePath) {
                 // Note finished
             }
+            DailyAnalyticsStore.recordVoiceNoteIntervention(this, level, currentForegroundPackage)
+            return true
         } catch (e: Exception) {
             Log.e("Watchdog", "Failed to trigger voice note", e)
+            return false
         }
     }
 
@@ -280,6 +306,38 @@ class WatchdogService : Service() {
             .mapValues { (_, packageStats) -> packageStats.sumOf { it.totalTimeInForeground } }
     }
 
+    private fun resetDailyStateIfNeeded() {
+        val nextDateKey = todayKey()
+        if (nextDateKey == stateDateKey) return
+
+        stateDateKey = nextDateKey
+        hasHitDailyLimitInitially = false
+        currentEscalationLevel = 0
+        sessionStartTimeMs = if (isUserInMonitoredApp) System.currentTimeMillis() else 0
+        lastInterventionTimeMs = 0
+        Log.d("Watchdog", "Daily watchdog state reset for $stateDateKey")
+    }
+
+    private fun todayKey(): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+    private fun getReEntryThresholds(limitMin: Int): ReEntryThresholds {
+        val levelOne = (limitMin * 0.33).roundToInt().coerceIn(1, 20)
+        val proportionalLevelTwo = (limitMin * 0.50).toInt().coerceAtMost(30)
+        val levelTwo = maxOf(levelOne + 5, proportionalLevelTwo).coerceAtMost(30)
+        val proportionalLevelThree = (limitMin * 0.60).toInt().coerceAtMost(36)
+        val levelThree = maxOf(levelTwo + 3, proportionalLevelThree).coerceAtMost(36)
+
+        return ReEntryThresholds(levelOne, levelTwo, levelThree)
+    }
+
+    private fun repeatLevelThreeMinutesRemaining(): Int {
+        if (lastInterventionTimeMs == 0L) return 0
+
+        val remainingMs = urgentRepeatIntervalMs - (System.currentTimeMillis() - lastInterventionTimeMs)
+        return ((remainingMs + 59999) / 60000).toInt()
+    }
+
     private fun createNotification(content: String): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Avoid Social Media")
@@ -307,4 +365,10 @@ class WatchdogService : Service() {
             manager.createNotificationChannel(serviceChannel)
         }
     }
+
+    private data class ReEntryThresholds(
+        val levelOneMinutes: Int,
+        val levelTwoMinutes: Int,
+        val levelThreeMinutes: Int,
+    )
 }

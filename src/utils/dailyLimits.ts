@@ -12,7 +12,7 @@ export const DEFAULT_DAILY_LIMIT_SETTING: DailyLimitSetting = {
 
 export const LIMIT_STEP_MINUTES = 5;
 
-const MIN_LIMIT_MINUTES = 5;
+const MIN_LIMIT_MINUTES = 15;
 const MAX_LIMIT_MINUTES = 480;
 
 export function parseDailyLimitSettings(

@@ -5,6 +5,9 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -16,11 +19,30 @@ import com.avoidsocialmedia.R
 class InterventionOverlay(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var overlayView: View? = null
 
     fun show(level: Int, packageName: String?, onDismiss: () -> Unit) {
-        if (overlayView != null) return
+        mainHandler.post {
+            if (overlayView != null) return@post
+            showOnMainThread(level, packageName, onDismiss)
+        }
+    }
 
+    fun replace(level: Int, packageName: String?, onDismiss: () -> Unit) {
+        mainHandler.post {
+            removeCurrentView()
+            showOnMainThread(level, packageName, onDismiss)
+        }
+    }
+
+    fun hide() {
+        mainHandler.post {
+            removeCurrentView()
+        }
+    }
+
+    private fun showOnMainThread(level: Int, packageName: String?, onDismiss: () -> Unit) {
         val appName = if (packageName != null) {
             try {
                 val pm = context.packageManager
@@ -84,10 +106,15 @@ class InterventionOverlay(private val context: Context) {
         }
     }
 
-    fun hide() {
+    private fun removeCurrentView() {
         overlayView?.let {
-            windowManager.removeView(it)
-            overlayView = null
+            try {
+                windowManager.removeView(it)
+            } catch (error: IllegalArgumentException) {
+                Log.w("InterventionOverlay", "Overlay view was already detached", error)
+            } finally {
+                overlayView = null
+            }
         }
     }
 }
