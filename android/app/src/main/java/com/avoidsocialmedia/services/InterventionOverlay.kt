@@ -102,7 +102,15 @@ class InterventionOverlay(private val context: Context) {
                 hide()
             }
 
-            windowManager.addView(view, layoutParams)
+            try {
+                windowManager.addView(view, layoutParams)
+            } catch (e: Exception) {
+                // SecurityException if overlay permission was revoked at runtime,
+                // or WindowManager.BadTokenException in rare cases. Log and bail
+                // rather than crashing the service silently.
+                Log.e("InterventionOverlay", "Failed to add overlay view", e)
+                overlayView = null
+            }
         }
     }
 

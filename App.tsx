@@ -292,6 +292,10 @@ function AppContent() {
         refreshNotificationAccess();
         refreshMicrophoneAccess();
         loadInstalledApps();
+        // Restart watchdog in case the OS killed it while the app was backgrounded
+        if (hasUsageAccess && hasOverlayAccess) {
+          UsageStatsModule?.startWatchdogService().catch(() => undefined);
+        }
       }
     });
 

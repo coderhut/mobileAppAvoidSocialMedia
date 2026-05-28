@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -12,7 +13,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.avoidsocialmedia.BuildConfig
 import com.avoidsocialmedia.R
@@ -35,6 +35,7 @@ class WatchdogService : Service() {
     private val urgentRepeatIntervalMs = 5 * 60 * 1000L
     private lateinit var voiceNotePlayer: VoiceNotePlayer
     private lateinit var interventionOverlay: InterventionOverlay
+    private var debugOverlay: DebugOverlay? = null  // non-null only in DEBUG builds
 
     // State Machine
     private var currentForegroundPackage: String? = null
@@ -68,7 +69,11 @@ class WatchdogService : Service() {
         super.onCreate()
         voiceNotePlayer = VoiceNotePlayer(this)
         interventionOverlay = InterventionOverlay(this)
+        if (BuildConfig.DEBUG) {
+            debugOverlay = DebugOverlay(this)
+        }
         createNotificationChannel()
+        restorePersistedState()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -86,6 +91,7 @@ class WatchdogService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        debugOverlay?.hide()
         isRunning = false
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
@@ -107,11 +113,10 @@ class WatchdogService : Service() {
 
         val prefs = getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
         val selectedPackageJson = prefs.getString("selectedPackageNames", "[]") ?: "[]"
-        val savedGlobalLimitMinutes = prefs.getInt("globalDailyLimit", 0)
+        val savedGlobalLimitMinutes = prefs.getInt("globalDailyLimit", 30) // Default 30 — JS state defaults to 30 but may not persist to SharedPreferences until user interacts
         val globalLimitMinutes = savedGlobalLimitMinutes.coerceAtLeast(minimumDailyLimitMinutes)
         val voiceNotesJson = prefs.getString("voiceNotes", "{}") ?: "{}"
-        
-        if (savedGlobalLimitMinutes <= 0) return
+        // Note: no early return for limit == 0 — coerceAtLeast guarantees at least 15 min
 
         val selectedPackages = mutableSetOf<String>()
         val jsonArray = JSONArray(selectedPackageJson)
@@ -119,7 +124,10 @@ class WatchdogService : Service() {
             selectedPackages.add(jsonArray.getString(i))
         }
 
-        if (selectedPackages.isEmpty()) return
+        if (selectedPackages.isEmpty()) {
+            Log.d("Watchdog", "No packages selected for tracking — skipping poll")
+            return
+        }
 
         // 1. Detect if user is in a monitored app
         val activePackage = getActiveForegroundPackage()
@@ -131,12 +139,13 @@ class WatchdogService : Service() {
         if (isUserInMonitoredApp && !wasInMonitoredApp) {
             // Started a new session
             sessionStartTimeMs = System.currentTimeMillis()
-            currentEscalationLevel = 0 
-            Log.d("Watchdog", "New monitored session started: $activePackage")
+            currentEscalationLevel = 0
+            Log.d("Watchdog", "Session START: $activePackage | limit=${globalLimitMinutes}m | hasHitLimit=$hasHitDailyLimitInitially")
         } else if (!isUserInMonitoredApp && wasInMonitoredApp) {
             // Left the distracting app
             voiceNotePlayer.stop()
             interventionOverlay.hide()
+            debugOverlay?.hide()
             sessionStartTimeMs = 0
             Log.d("Watchdog", "Monitored session ended")
         }
@@ -148,41 +157,22 @@ class WatchdogService : Service() {
         DailyAnalyticsStore.updateUsageSnapshot(this, usageByPackage, globalLimitMinutes)
 
         // 4. Escalation Logic
-        if (totalUsageMinutes >= globalLimitMinutes) {
+        val overLimit = totalUsageMinutes >= globalLimitMinutes
+        Log.d("Watchdog", "Poll: pkg=$activePackage inApp=$isUserInMonitoredApp usage=${totalUsageMinutes}m limit=${globalLimitMinutes}m overLimit=$overLimit lvl=$currentEscalationLevel")
+        if (overLimit) {
             handleEscalation(totalUsageMinutes, globalLimitMinutes, voiceNotesJson)
-            updateNotification("Limit reached: $totalUsageMinutes/$globalLimitMinutes min")
+            updateNotification("Limit reached: ${totalUsageMinutes}/${globalLimitMinutes} min")
         } else {
             hasHitDailyLimitInitially = false
-            updateNotification("Usage: $totalUsageMinutes/$globalLimitMinutes min")
+            updateNotification("Usage: ${totalUsageMinutes}/${globalLimitMinutes} min")
         }
 
-        // Test Toast - Only in Debug builds
-        if (BuildConfig.DEBUG) {
-            val nextVNMin = getNextVNInMinutes(totalUsageMinutes, globalLimitMinutes)
-            if (nextVNMin > 0 && isUserInMonitoredApp) {
-                Toast.makeText(this, "Next VN in $nextVNMin minutes", Toast.LENGTH_SHORT).show()
-            }
+        // Debug HUD overlay — persists on-screen while user is in a tracked app (DEBUG only)
+        if (isUserInMonitoredApp) {
+            debugOverlay?.showOrUpdate(buildDebugHudText(totalUsageMs, globalLimitMinutes))
         }
-    }
 
-    private fun getNextVNInMinutes(currentMin: Int, limitMin: Int): Int {
-        return if (!hasHitDailyLimitInitially) {
-            when (currentEscalationLevel) {
-                0 -> limitMin - currentMin
-                1 -> (limitMin + 5) - currentMin
-                2 -> (limitMin + 8) - currentMin
-                else -> 0
-            }
-        } else {
-            val sessionElapsedMin = ((System.currentTimeMillis() - sessionStartTimeMs) / 60000).toInt()
-            val thresholds = getReEntryThresholds(limitMin)
-            when (currentEscalationLevel) {
-                0 -> thresholds.levelOneMinutes - sessionElapsedMin
-                1 -> thresholds.levelTwoMinutes - sessionElapsedMin
-                2 -> thresholds.levelThreeMinutes - sessionElapsedMin
-                else -> repeatLevelThreeMinutesRemaining()
-            }
-        }.coerceAtLeast(0)
+        saveWatchdogDebugInfo(totalUsageMs, globalLimitMinutes)
     }
 
     private fun handleEscalation(currentMin: Int, limitMin: Int, voiceNotesJson: String) {
@@ -220,7 +210,7 @@ class WatchdogService : Service() {
                 hasHitDailyLimitInitially = true
                 DailyAnalyticsStore.recordLimitHit(this, currentForegroundPackage)
             }
-            
+            persistEscalationState()
             if (triggerVoiceNote(targetLevel, voiceNotesJson)) {
                 lastInterventionTimeMs = currentTime
             }
@@ -236,52 +226,55 @@ class WatchdogService : Service() {
     }
 
     private fun triggerVoiceNote(level: Int, voiceNotesJson: String): Boolean {
-        try {
-            val json = JSONObject(voiceNotesJson)
-            val levelData = json.opt(level.toString()) ?: return false
-            
-            val availablePaths = mutableListOf<String>()
-            
-            if (levelData is JSONArray) {
-                for (i in 0 until levelData.length()) {
-                    availablePaths.add(levelData.getString(i))
-                }
-            } else if (levelData is JSONObject) {
-                val keys = levelData.keys()
-                while (keys.hasNext()) {
-                    availablePaths.add(levelData.getString(keys.next()))
-                }
-            }
-
-            if (availablePaths.isEmpty()) return false
-
-            // Pick a random note from the level
-            val randomIndex = Random.nextInt(availablePaths.size)
-            val filePath = availablePaths[randomIndex]
-
-            Log.d("Watchdog", "Playing Level $level note: $filePath")
-            
+        return try {
+            // Always show overlay — intervention must appear even if no voice note is recorded
             voiceNotePlayer.stop()
             interventionOverlay.replace(level, currentForegroundPackage) {
                 voiceNotePlayer.stop()
             }
-            voiceNotePlayer.play(filePath) {
-                // Note finished
-            }
+            // Play audio best-effort — a missing recording should never block the overlay
+            tryPlayVoiceNote(level, voiceNotesJson)
             DailyAnalyticsStore.recordVoiceNoteIntervention(this, level, currentForegroundPackage)
-            return true
+            Log.d("Watchdog", "Intervention triggered at Level $level for $currentForegroundPackage")
+            true
         } catch (e: Exception) {
-            Log.e("Watchdog", "Failed to trigger voice note", e)
-            return false
+            Log.e("Watchdog", "Failed to trigger intervention", e)
+            false
         }
     }
 
     private fun getActiveForegroundPackage(): String? {
         val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val time = System.currentTimeMillis()
-        val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 1000 * 60, time)
-        
-        return stats?.maxByOrNull { it.lastTimeUsed }?.packageName
+        val endTime = System.currentTimeMillis()
+        val startTime = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        return try {
+            // queryEvents is reliable: lastTimeUsed is updated when an app goes to BACKGROUND,
+            // not when it enters foreground — so maxByOrNull{lastTimeUsed} returns the wrong app.
+            // Replaying MOVE_TO_FOREGROUND / MOVE_TO_BACKGROUND events gives the correct answer.
+            val events = usageStatsManager.queryEvents(startTime, endTime)
+            var lastForeground: String? = null
+            val event = UsageEvents.Event()
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                when (event.eventType) {
+                    UsageEvents.Event.MOVE_TO_FOREGROUND -> lastForeground = event.packageName
+                    UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                        if (lastForeground == event.packageName) lastForeground = null
+                    }
+                }
+            }
+            lastForeground
+        } catch (e: Exception) {
+            Log.e("Watchdog", "queryEvents failed — falling back to queryUsageStats", e)
+            val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, endTime - 60_000, endTime)
+            stats?.maxByOrNull { it.lastTimeUsed }?.packageName
+        }
     }
 
     private fun calculateUsageByPackage(packageNames: Set<String>): Map<String, Long> {
@@ -315,6 +308,7 @@ class WatchdogService : Service() {
         currentEscalationLevel = 0
         sessionStartTimeMs = if (isUserInMonitoredApp) System.currentTimeMillis() else 0
         lastInterventionTimeMs = 0
+        persistEscalationState()
         Log.d("Watchdog", "Daily watchdog state reset for $stateDateKey")
     }
 
@@ -329,6 +323,196 @@ class WatchdogService : Service() {
         val levelThree = maxOf(levelTwo + 3, proportionalLevelThree).coerceAtMost(36)
 
         return ReEntryThresholds(levelOne, levelTwo, levelThree)
+    }
+
+    // ── Persistence (survives OS-level service restarts within the same day) ──────────────────
+
+    private fun restorePersistedState() {
+        val prefs = getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+        val savedDate = prefs.getString("watchdogStateDate", null)
+        if (savedDate == todayKey()) {
+            hasHitDailyLimitInitially = prefs.getBoolean("watchdogHasHitLimit", false)
+            currentEscalationLevel = prefs.getInt("watchdogEscalationLevel", 0)
+            Log.d("Watchdog", "Restored: hasHitLimit=$hasHitDailyLimitInitially level=$currentEscalationLevel")
+        } else {
+            Log.d("Watchdog", "No persisted state for today — starting fresh")
+        }
+    }
+
+    private fun persistEscalationState() {
+        getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+            .edit()
+            .putString("watchdogStateDate", todayKey())
+            .putBoolean("watchdogHasHitLimit", hasHitDailyLimitInitially)
+            .putInt("watchdogEscalationLevel", currentEscalationLevel)
+            .apply()
+    }
+
+    // ── Voice note player (separated from overlay so missing recordings never block alerts) ────
+
+    private fun tryPlayVoiceNote(level: Int, voiceNotesJson: String) {
+        try {
+            val json = JSONObject(voiceNotesJson)
+            val levelData = json.opt(level.toString()) ?: return
+
+            val availablePaths = mutableListOf<String>()
+            if (levelData is JSONArray) {
+                for (i in 0 until levelData.length()) availablePaths.add(levelData.getString(i))
+            } else if (levelData is JSONObject) {
+                val keys = levelData.keys()
+                while (keys.hasNext()) availablePaths.add(levelData.getString(keys.next()))
+            }
+
+            if (availablePaths.isEmpty()) {
+                Log.d("Watchdog", "No voice note for Level $level — overlay shown without audio")
+                return
+            }
+
+            val filePath = availablePaths[Random.nextInt(availablePaths.size)]
+            Log.d("Watchdog", "Playing Level $level note: $filePath")
+            voiceNotePlayer.play(filePath) { /* note finished */ }
+        } catch (e: Exception) {
+            Log.e("Watchdog", "Failed to play voice note", e)
+        }
+    }
+
+    // ── Debug info (written to SharedPreferences, read by WatchdogDebugScreen) ────────────────
+
+    private fun saveWatchdogDebugInfo(totalUsageMs: Long, limitMin: Int) {
+        val currentTime = System.currentTimeMillis()
+        val sessionElapsedMs =
+            if (isUserInMonitoredApp && sessionStartTimeMs > 0L) currentTime - sessionStartTimeMs else 0L
+        val totalUsageMin = (totalUsageMs / 60000).toInt()
+
+        val scenario = when {
+            !isUserInMonitoredApp && totalUsageMin < limitMin -> "Under limit"
+            !isUserInMonitoredApp -> "Over limit \u2014 not in app"
+            !hasHitDailyLimitInitially -> "Scenario 1: First breach"
+            else -> "Scenario 2: Re-entry"
+        }
+
+        val rows = JSONArray().apply {
+            if (!isUserInMonitoredApp) {
+                listOf("Level 1", "Level 2", "Level 3", "Repeat L3").forEach { level ->
+                    put(createDebugRow(level, "N/A", "Not in tracked app", "N/A"))
+                }
+            } else if (!hasHitDailyLimitInitially) {
+                put(createDebugRow("Level 1", "$limitMin min total", remainingOrFired(limitMin * 60000L - totalUsageMs, currentEscalationLevel >= 1), statusForLevel(1)))
+                put(createDebugRow("Level 2", "${limitMin + 5} min total", remainingOrFired((limitMin + 5) * 60000L - totalUsageMs, currentEscalationLevel >= 2), statusForLevel(2)))
+                put(createDebugRow("Level 3", "${limitMin + 8} min total", remainingOrFired((limitMin + 8) * 60000L - totalUsageMs, currentEscalationLevel >= 3), statusForLevel(3)))
+                put(createDebugRow("Repeat L3", "Every 5 min after L3", if (currentEscalationLevel >= 3) formatRemainingMs(urgentRepeatIntervalMs - (currentTime - lastInterventionTimeMs)) else "After L3 fires", if (currentEscalationLevel >= 3) "Active" else "Pending"))
+            } else {
+                val thresholds = getReEntryThresholds(limitMin)
+                put(createDebugRow("Level 1", "+${thresholds.levelOneMinutes} min session", remainingOrFired(thresholds.levelOneMinutes * 60000L - sessionElapsedMs, currentEscalationLevel >= 1), statusForLevel(1)))
+                put(createDebugRow("Level 2", "+${thresholds.levelTwoMinutes} min session", remainingOrFired(thresholds.levelTwoMinutes * 60000L - sessionElapsedMs, currentEscalationLevel >= 2), statusForLevel(2)))
+                put(createDebugRow("Level 3", "+${thresholds.levelThreeMinutes} min session", remainingOrFired(thresholds.levelThreeMinutes * 60000L - sessionElapsedMs, currentEscalationLevel >= 3), statusForLevel(3)))
+                put(createDebugRow("Repeat L3", "Every 5 min after L3", if (currentEscalationLevel >= 3) formatRemainingMs(urgentRepeatIntervalMs - (currentTime - lastInterventionTimeMs)) else "After L3 fires", if (currentEscalationLevel >= 3) "Active" else "Pending"))
+            }
+        }
+
+        val debugInfo = JSONObject().apply {
+            put("scenario", scenario)
+            put("isInMonitoredApp", isUserInMonitoredApp)
+            put("activePackage", currentForegroundPackage ?: JSONObject.NULL)
+            put("totalUsageMs", totalUsageMs)
+            put("sessionElapsedMs", sessionElapsedMs)
+            put("currentEscalationLevel", currentEscalationLevel)
+            put("rows", rows)
+            put("updatedAt", currentTime)
+        }
+
+        getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+            .edit()
+            .putString("watchdogDebugInfo", debugInfo.toString())
+            .apply()
+    }
+
+    private fun createDebugRow(level: String, firesAt: String, timeRemaining: String, status: String) =
+        JSONObject().apply {
+            put("level", level)
+            put("firesAt", firesAt)
+            put("timeRemaining", timeRemaining)
+            put("status", status)
+        }
+
+    private fun remainingOrFired(remainingMs: Long, alreadyFired: Boolean): String =
+        if (alreadyFired || remainingMs <= 0L) "Fired" else formatRemainingMs(remainingMs)
+
+    private fun statusForLevel(level: Int): String = when {
+        currentEscalationLevel > level -> "Already fired"
+        currentEscalationLevel == level -> "Active"
+        else -> "Pending"
+    }
+
+    private fun formatRemainingMs(milliseconds: Long): String {
+        val s = (milliseconds.coerceAtLeast(0L) + 999L) / 1000L
+        return "${s / 60} min ${(s % 60).toString().padStart(2, '0')} sec"
+    }
+
+    // ── Debug HUD helpers ──────────────────────────────────────────────────────────────────
+
+    /**
+     * Builds the multi-line string shown in the top-left debug HUD while in a tracked app.
+     * Format:
+     *   WDG | 43/30m | L3-urgent
+     *   Re-entry | Next: 2:35
+     */
+    private fun buildDebugHudText(totalUsageMs: Long, limitMin: Int): String {
+        val totalUsageMin = (totalUsageMs / 60000).toInt()
+        val levelLabel = when (currentEscalationLevel) {
+            1 -> "L1-gentle"
+            2 -> "L2-firm"
+            3 -> "L3-urgent"
+            else -> "L0-none"
+        }
+        val scenarioLabel = if (!hasHitDailyLimitInitially) "First Breach" else "Re-entry"
+        val nextMs = computeNextInterventionMs(totalUsageMs, limitMin)
+        val nextFormatted = if (nextMs <= 0L) {
+            "NOW"
+        } else {
+            val totalSec = (nextMs / 1000L).coerceAtLeast(0L)
+            "${totalSec / 60}:${(totalSec % 60).toString().padStart(2, '0')}"
+        }
+        return "WDG | ${totalUsageMin}/${limitMin}m | $levelLabel\n$scenarioLabel | Next: $nextFormatted"
+    }
+
+    /**
+     * Returns milliseconds until the next intervention fires.
+     * For Scenario 1 (first breach): based on cumulative daily usage.
+     * For Scenario 2 (re-entry): based on current session elapsed time.
+     * For Repeat L3: based on time since last intervention.
+     */
+    private fun computeNextInterventionMs(totalUsageMs: Long, limitMin: Int): Long {
+        val currentTime = System.currentTimeMillis()
+        val sessionElapsedMs =
+            if (sessionStartTimeMs > 0L) (currentTime - sessionStartTimeMs) else 0L
+
+        return if (!hasHitDailyLimitInitially) {
+            // Scenario 1: level gates are total usage milestones
+            when (currentEscalationLevel) {
+                0 -> limitMin * 60000L - totalUsageMs
+                1 -> (limitMin + 5) * 60000L - totalUsageMs
+                2 -> (limitMin + 8) * 60000L - totalUsageMs
+                else -> { // L3 fired, waiting for Repeat L3
+                    if (lastInterventionTimeMs > 0L)
+                        urgentRepeatIntervalMs - (currentTime - lastInterventionTimeMs)
+                    else urgentRepeatIntervalMs
+                }
+            }
+        } else {
+            // Scenario 2: level gates are session-elapsed-time milestones
+            val thresholds = getReEntryThresholds(limitMin)
+            when (currentEscalationLevel) {
+                0 -> thresholds.levelOneMinutes * 60000L - sessionElapsedMs
+                1 -> thresholds.levelTwoMinutes * 60000L - sessionElapsedMs
+                2 -> thresholds.levelThreeMinutes * 60000L - sessionElapsedMs
+                else -> { // L3 fired, waiting for Repeat L3
+                    if (lastInterventionTimeMs > 0L)
+                        urgentRepeatIntervalMs - (currentTime - lastInterventionTimeMs)
+                    else urgentRepeatIntervalMs
+                }
+            }
+        }.coerceAtLeast(0L)
     }
 
     private fun repeatLevelThreeMinutesRemaining(): Int {

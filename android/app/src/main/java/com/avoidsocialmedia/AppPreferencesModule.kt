@@ -24,7 +24,7 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
         putString("dailyAnalytics", preferences.getString("dailyAnalytics", "{}"))
         putString("voiceNotes", preferences.getString("voiceNotes", "{}"))
         putString("voiceNoteDurations", preferences.getString("voiceNoteDurations", "{}"))
-        putInt("globalDailyLimit", preferences.getInt("globalDailyLimit", 0))
+        putInt("globalDailyLimit", preferences.getInt("globalDailyLimit", 30))
         putBoolean("hasCompletedOnboarding", preferences.getBoolean("hasCompletedOnboarding", false))
         putArray(
           "selectedPackageNames",
