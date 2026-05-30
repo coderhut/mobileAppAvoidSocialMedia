@@ -5,6 +5,7 @@ export type Step =
   | 'apps'
   | 'setup_permissions'
   | 'debug_watchdog'
+  | 'insights'
   | 'dashboard';
 export type ThemeMode = 'light' | 'dark';
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -62,10 +63,43 @@ export type TranslationKey =
   | 'appSingular'
   | 'appPlural'
   | 'dashboard'
+  | 'insights'
+  | 'weeklyInsightsTitle'
+  | 'weeklyInsightsBody'
+  | 'weekTabLabel'
+  | 'monthTabLabel'
+  | 'allTimeTabLabel'
+  | 'monthlyInsightsTitle'
+  | 'monthlyInsightsBody'
+  | 'allTimeInsightsTitle'
+  | 'allTimeInsightsBody'
+  | 'longestStreakLabel'
+  | 'bestUsageDayLabel'
+  | 'worstUsageDayLabel'
+  | 'noAllTimeRecordsLabel'
+  | 'limitWasLabel'
+  | 'monthTotalLabel'
+  | 'voiceNotesMonthLabel'
+  | 'summaryOnlyMonthLabel'
+  | 'topInterventionAppLabel'
+  | 'dayDetailsLabel'
+  | 'totalUsageLabel'
+  | 'usageStatusLabel'
+  | 'limitHitsLabel'
+  | 'perAppUsageLabel'
+  | 'noUsageRecordedLabel'
+  | 'weekTotalLabel'
+  | 'daysUnderLimitLabel'
+  | 'dailyLimitLineLabel'
+  | 'noInsightsYetLabel'
   | 'dashboardTitle'
   | 'dashboardBody'
   | 'dashboardEmpty'
   | 'trackedToday'
+  | 'currentStreakLabel'
+  | 'underLimitTodayLabel'
+  | 'overLimitTodayLabel'
+  | 'voiceInterventionsLabel'
   | 'usageStatsUnavailable'
   | 'usageAccessNeeded'
   | 'enableUsageAccessBody'
@@ -190,6 +224,7 @@ export type UsageStatsBridge = {
   stopWatchdogService: () => Promise<void>;
   getWatchdogDebugInfo: () => Promise<string | null>;
   resetWatchdogCompoundTime: () => Promise<void>;
+  seedAnalyticsTestData: () => Promise<void>;
 };
 
 export type AppPreferences = {

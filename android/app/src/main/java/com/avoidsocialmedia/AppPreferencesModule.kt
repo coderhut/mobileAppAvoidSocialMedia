@@ -1,5 +1,6 @@
 package com.avoidsocialmedia
 
+import com.avoidsocialmedia.analytics.DailyAnalyticsStore
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -7,6 +8,9 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 import org.json.JSONArray
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -95,7 +99,18 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
   @ReactMethod
   fun setHasCompletedOnboarding(completed: Boolean, promise: Promise) {
     try {
-      getSharedPreferences().edit().putBoolean("hasCompletedOnboarding", completed).apply()
+      val preferences = getSharedPreferences()
+      val editor = preferences.edit().putBoolean("hasCompletedOnboarding", completed)
+      if (completed && !preferences.contains("onboardingCompletedDate")) {
+        editor.putString("onboardingCompletedDate", todayKey())
+      }
+      if (!completed) {
+        editor.remove("onboardingCompletedDate")
+      }
+      editor.apply()
+      if (completed) {
+        DailyAnalyticsStore.initializeAfterOnboarding(reactContext)
+      }
       promise.resolve(null)
     } catch (error: Exception) {
       promise.reject("PREFERENCES_WRITE_FAILED", error)
@@ -113,6 +128,9 @@ class AppPreferencesModule(private val reactContext: ReactApplicationContext) :
 
   private fun getSharedPreferences() =
     reactContext.getSharedPreferences("avoid_social_media_preferences", 0)
+
+  private fun todayKey(): String =
+    SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
   private fun packageNamesToArray(value: String?) = Arguments.createArray().apply {
     val jsonArray = JSONArray(value ?: "[]")

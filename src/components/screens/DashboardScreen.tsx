@@ -18,6 +18,7 @@ export function DashboardScreen({
   availableApps,
   hasUsageAccess,
   totalTrackedMs,
+  dailyAnalytics,
   usageByPackage,
   usageError,
   onEditApps,
@@ -27,6 +28,7 @@ export function DashboardScreen({
   availableApps: TrackableApp[];
   hasUsageAccess: boolean;
   totalTrackedMs: number;
+  dailyAnalytics: string;
   usageByPackage: Record<string, UsageStat>;
   usageError: string | null;
   onEditApps: () => void;
@@ -42,6 +44,10 @@ export function DashboardScreen({
 
   const nextLowerGlobal = clampLimitMinutes(globalDailyLimit - LIMIT_STEP_MINUTES);
   const nextHigherGlobal = clampLimitMinutes(globalDailyLimit + LIMIT_STEP_MINUTES);
+  const todayAnalytics = useMemo(
+    () => parseTodayAnalytics(dailyAnalytics, globalDailyLimit, totalTrackedMs),
+    [dailyAnalytics, globalDailyLimit, totalTrackedMs],
+  );
 
   const installedPackageNames = useMemo(
     () => new Set(availableApps.map(app => app.packageName)),
@@ -81,6 +87,39 @@ export function DashboardScreen({
       <View style={[styles.metricPanel, {backgroundColor: colors.metricBackground}]}>
         <Text style={[styles.metricNumber, {color: colors.metricText}]}>{formatDuration(totalTrackedMs)}</Text>
         <Text style={[styles.metricLabel, {color: colors.metricLabel}]}>{t('trackedToday')}</Text>
+      </View>
+
+      <View style={localStyles.insightGrid}>
+        <View style={[localStyles.insightTile, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+          <Text style={[localStyles.insightValue, {color: colors.text}]}>
+            {todayAnalytics.currentStreak}
+          </Text>
+          <Text style={[localStyles.insightLabel, {color: colors.subtleText}]}>
+            {t('currentStreakLabel')}
+          </Text>
+        </View>
+        <View style={[localStyles.insightTile, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+          <Text
+            style={[
+              localStyles.insightValue,
+              {color: todayAnalytics.stayedUnderLimit ? colors.success : colors.noticeTitle},
+            ]}>
+            {todayAnalytics.stayedUnderLimit ? '✓' : '!'}
+          </Text>
+          <Text style={[localStyles.insightLabel, {color: colors.subtleText}]}>
+            {todayAnalytics.stayedUnderLimit
+              ? t('underLimitTodayLabel')
+              : t('overLimitTodayLabel')}
+          </Text>
+        </View>
+        <View style={[localStyles.insightTile, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+          <Text style={[localStyles.insightValue, {color: colors.text}]}>
+            {todayAnalytics.voiceNoteInterventions}
+          </Text>
+          <Text style={[localStyles.insightLabel, {color: colors.subtleText}]}>
+            {t('voiceInterventionsLabel')}
+          </Text>
+        </View>
       </View>
 
       <View style={[styles.usageCard, localStyles.limitCard]}>
@@ -172,7 +211,86 @@ export function DashboardScreen({
   );
 }
 
+type TodayAnalytics = {
+  currentStreak: number;
+  stayedUnderLimit: boolean;
+  voiceNoteInterventions: number;
+};
+
+function parseTodayAnalytics(
+  dailyAnalytics: string,
+  globalDailyLimit: number,
+  totalTrackedMs: number,
+): TodayAnalytics {
+  const fallbackStayedUnderLimit = totalTrackedMs < globalDailyLimit * 60000;
+
+  try {
+    const parsed = JSON.parse(dailyAnalytics || '{}') as {
+      currentStreak?: unknown;
+      daily?: Record<string, {
+        stayedUnderDailyLimit?: unknown;
+        voiceNoteInterventions?: unknown;
+      }>;
+    };
+    const today = parsed.daily?.[todayKey()];
+    const currentStreak =
+      typeof parsed.currentStreak === 'number' ? parsed.currentStreak : 0;
+    const stayedUnderLimit =
+      typeof today?.stayedUnderDailyLimit === 'boolean'
+        ? today.stayedUnderDailyLimit
+        : fallbackStayedUnderLimit;
+    const voiceNoteInterventions =
+      typeof today?.voiceNoteInterventions === 'number'
+        ? today.voiceNoteInterventions
+        : 0;
+
+    return {
+      currentStreak,
+      stayedUnderLimit,
+      voiceNoteInterventions,
+    };
+  } catch {
+    return {
+      currentStreak: 0,
+      stayedUnderLimit: fallbackStayedUnderLimit,
+      voiceNoteInterventions: 0,
+    };
+  }
+}
+
+function todayKey() {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${today.getFullYear()}-${month}-${day}`;
+}
+
 const localStyles = StyleSheet.create({
+    insightGrid: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 18,
+    },
+    insightTile: {
+        borderRadius: 16,
+        borderWidth: 1,
+        flex: 1,
+        minHeight: 92,
+        paddingHorizontal: 10,
+        paddingVertical: 14,
+    },
+    insightValue: {
+        fontSize: 24,
+        fontWeight: '900',
+        marginBottom: 6,
+        textAlign: 'center',
+    },
+    insightLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        lineHeight: 16,
+        textAlign: 'center',
+    },
     limitCard: {
         marginBottom: 32,
         padding: 20,

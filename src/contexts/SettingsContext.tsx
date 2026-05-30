@@ -52,6 +52,8 @@ type SettingsContextType = {
   deleteVoiceNote: (level: number, index: number) => void;
   globalDailyLimit: number;
   setGlobalDailyLimit: (limit: number) => void;
+  dailyAnalytics: string;
+  refreshDailyAnalytics: () => Promise<void>;
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(
@@ -88,6 +90,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   });
   const voiceNoteDurationsRef = useRef(voiceNoteDurations);
   const [globalDailyLimit, setGlobalDailyLimitState] = useState<number>(30); // Default 30 mins
+  const [dailyAnalytics, setDailyAnalytics] = useState<string>('{}');
 
   useEffect(() => {
     if (!AppPreferencesModule) {
@@ -113,6 +116,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         if (preferences.hasCompletedOnboarding === true) {
           setHasCompletedOnboardingState(true);
+        }
+
+        if (preferences.dailyAnalytics) {
+          setDailyAnalytics(preferences.dailyAnalytics);
         }
 
         if (
@@ -317,6 +324,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     AppPreferencesModule?.setGlobalDailyLimit(nextLimit).catch(() => undefined);
   }, []);
 
+  const refreshDailyAnalytics = useCallback(async () => {
+    if (!AppPreferencesModule) {
+      return;
+    }
+
+    try {
+      const preferences = await AppPreferencesModule.getPreferences();
+      setDailyAnalytics(preferences.dailyAnalytics ?? '{}');
+    } catch {
+      // Keep the last known analytics snapshot if preferences cannot be read.
+    }
+  }, []);
+
   const value = {
     selectedPackageNames,
     toggleApp,
@@ -337,6 +357,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     deleteVoiceNote,
     globalDailyLimit,
     setGlobalDailyLimit,
+    dailyAnalytics,
+    refreshDailyAnalytics,
   };
 
   return (

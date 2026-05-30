@@ -15,16 +15,20 @@ export function SettingsPanel({
   isVisible,
   onClose,
   onEditRecordings,
+  onOpenInsights,
   onManagePermissions,
   onOpenWatchdogDebug,
   onResetWatchdogTime,
+  onSeedAnalyticsTestData,
 }: {
   isVisible: boolean;
   onClose: () => void;
   onEditRecordings?: () => void;
+  onOpenInsights?: () => void;
   onManagePermissions?: () => void;
   onOpenWatchdogDebug?: () => void;
   onResetWatchdogTime?: () => void;
+  onSeedAnalyticsTestData?: () => void;
 }) {
   const [isThemeSheetOpen, setIsThemeSheetOpen] = useState(false);
   const [isLanguageSheetOpen, setIsLanguageSheetOpen] = useState(false);
@@ -133,6 +137,19 @@ export function SettingsPanel({
               </Pressable>
             )}
 
+            {onOpenInsights && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  handleClose();
+                  onOpenInsights();
+                }}
+                style={styles.optionRow}
+              >
+                <Text style={styles.optionLabel}>{t('insights')}</Text>
+              </Pressable>
+            )}
+
             {onManagePermissions && (
               <Pressable
                 accessibilityRole="button"
@@ -171,6 +188,19 @@ export function SettingsPanel({
                 style={styles.optionRow}
               >
                 <Text style={styles.optionLabel}>Reset Compound Time</Text>
+              </Pressable>
+            )}
+
+            {onSeedAnalyticsTestData && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  handleClose();
+                  onSeedAnalyticsTestData();
+                }}
+                style={styles.optionRow}
+              >
+                <Text style={styles.optionLabel}>Seed Analytics Test Data</Text>
               </Pressable>
             )}
           </View>

@@ -217,6 +217,20 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
+  // NSR - For testing purposes only - Comment out before production build
+  @ReactMethod
+  fun seedAnalyticsTestData(promise: Promise) {
+    try {
+      val preferences =
+        reactContext.getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+      val globalLimitMinutes = preferences.getInt("globalDailyLimit", 30).coerceAtLeast(15)
+      DailyAnalyticsStore.seedAnalyticsTestData(reactContext, globalLimitMinutes)
+      promise.resolve(null)
+    } catch (error: Exception) {
+      promise.reject("ANALYTICS_TEST_DATA_SEED_FAILED", error)
+    }
+  }
+
   @ReactMethod
   fun getTodayUsageStats(promise: Promise) {
     if (!hasUsageStatsPermission()) {

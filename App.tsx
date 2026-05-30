@@ -14,6 +14,7 @@ import {
 import { SettingsPanel } from './src/components/common/SettingsPanel';
 import { AppSelectionScreen } from './src/components/screens/AppSelectionScreen';
 import { DashboardScreen } from './src/components/screens/DashboardScreen';
+import { InsightsScreen } from './src/components/screens/InsightsScreen';
 import { IntroScreen } from './src/components/screens/IntroScreen';
 import { LanguageSelectionScreen } from './src/components/screens/LanguageSelectionScreen';
 import { SetupPermissionsScreen } from './src/components/screens/SetupPermissionsScreen';
@@ -97,6 +98,8 @@ function AppContent() {
     isLoadingPreferences,
     hasCompletedOnboarding,
     setHasCompletedOnboarding,
+    dailyAnalytics,
+    refreshDailyAnalytics,
   } = useSettings();
   const [step, setStep] = useState<Step>('language');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -246,12 +249,13 @@ function AppContent() {
     try {
       const stats = await UsageStatsModule.getTodayUsageStats();
       setUsageStats(stats);
+      await refreshDailyAnalytics();
       setUsageError(null);
     } catch {
       setUsageStats([]);
       setUsageError(t('usageStatsUnavailableBody'));
     }
-  }, [t]);
+  }, [refreshDailyAnalytics, t]);
 
   const loadInstalledApps = React.useCallback(async () => {
     if (Platform.OS !== 'android' || !UsageStatsModule) {
@@ -292,6 +296,27 @@ function AppContent() {
       );
     }
   }, []);
+
+  // NSR - For testing purposes only - Comment out before production build
+  const seedAnalyticsTestData = React.useCallback(async () => {
+    if (Platform.OS !== 'android' || !UsageStatsModule) {
+      return;
+    }
+
+    try {
+      await UsageStatsModule.seedAnalyticsTestData();
+      await refreshDailyAnalytics();
+      Alert.alert(
+        'Analytics Test Data',
+        'Seeded local analytics test data for dashboard and insights testing.',
+      );
+    } catch {
+      Alert.alert(
+        'Analytics Test Data',
+        'Unable to seed analytics test data.',
+      );
+    }
+  }, [refreshDailyAnalytics]);
 
   React.useEffect(() => {
     if (hasUsageAccess && hasOverlayAccess && step === 'dashboard') {
@@ -336,6 +361,12 @@ function AppContent() {
       refreshUsageStats();
     }
   }, [hasUsageAccess, refreshUsageStats]);
+
+  React.useEffect(() => {
+    if (visibleStep === 'insights') {
+      refreshDailyAnalytics();
+    }
+  }, [refreshDailyAnalytics, visibleStep]);
 
   React.useEffect(() => {
     if (hasCompletedOnboarding) {
@@ -434,11 +465,23 @@ function AppContent() {
       );
     }
 
+    if (visibleStep === 'insights') {
+      return (
+        <InsightsScreen
+          dailyAnalytics={dailyAnalytics}
+          onGoHome={() => setStep('dashboard')}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onRefresh={refreshUsageStats}
+        />
+      );
+    }
+
     return (
       <DashboardScreen
         availableApps={availableApps}
         hasUsageAccess={hasUsageAccess}
         totalTrackedMs={totalTrackedMs}
+        dailyAnalytics={dailyAnalytics}
         usageByPackage={usageByPackage}
         usageError={usageError}
         onEditApps={() => setStep('apps')}
@@ -476,9 +519,11 @@ function AppContent() {
         isVisible={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onEditRecordings={() => setStep('recordings')}
+        onOpenInsights={() => setStep('insights')}
         onManagePermissions={() => setStep('setup_permissions')}
         onOpenWatchdogDebug={() => setStep('debug_watchdog')}
         onResetWatchdogTime={resetWatchdogCompoundTime}
+        onSeedAnalyticsTestData={seedAnalyticsTestData}
       />
     </View>
   );
