@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -17,10 +16,10 @@ import androidx.core.app.NotificationCompat
 import com.avoidsocialmedia.BuildConfig
 import com.avoidsocialmedia.R
 import com.avoidsocialmedia.analytics.DailyAnalyticsStore
+import com.avoidsocialmedia.usage.UsageEventsCalculator
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -253,30 +252,15 @@ class WatchdogService : Service() {
     private fun getActiveForegroundPackage(): String? {
         val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val endTime = System.currentTimeMillis()
-        val startTime = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-
         return try {
             // queryEvents is reliable: lastTimeUsed is updated when an app goes to BACKGROUND,
             // not when it enters foreground — so maxByOrNull{lastTimeUsed} returns the wrong app.
             // Replaying MOVE_TO_FOREGROUND / MOVE_TO_BACKGROUND events gives the correct answer.
-            val events = usageStatsManager.queryEvents(startTime, endTime)
-            var lastForeground: String? = null
-            val event = UsageEvents.Event()
-            while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                when (event.eventType) {
-                    UsageEvents.Event.MOVE_TO_FOREGROUND -> lastForeground = event.packageName
-                    UsageEvents.Event.MOVE_TO_BACKGROUND -> {
-                        if (lastForeground == event.packageName) lastForeground = null
-                    }
-                }
-            }
-            lastForeground
+            UsageEventsCalculator.getActiveForegroundPackage(
+                usageStatsManager,
+                UsageEventsCalculator.localStartOfDayMs(),
+                endTime,
+            )
         } catch (e: Exception) {
             Log.e("Watchdog", "queryEvents failed — falling back to queryUsageStats", e)
             val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, endTime - 60_000, endTime)
@@ -287,28 +271,21 @@ class WatchdogService : Service() {
     private fun calculateUsageByPackage(packageNames: Set<String>): Map<String, Long> {
         val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val endTime = System.currentTimeMillis()
-        val startTime = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-
-        val stats = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
-            startTime,
-            endTime
-        )
+        val startTime = UsageEventsCalculator.localStartOfDayMs()
 
         val baselines = readUsageResetBaselines()
+        val rawUsageByPackage = UsageEventsCalculator.calculateUsageByEvents(
+            usageStatsManager,
+            packageNames,
+            startTime,
+            endTime,
+        )
 
-        return stats
-            .filter { it.totalTimeInForeground > 0 && packageNames.contains(it.packageName) }
-            .groupBy { it.packageName }
-            .mapValues { (packageName, packageStats) ->
-                val rawUsageMs = packageStats.sumOf { it.totalTimeInForeground }
+        return rawUsageByPackage
+            .mapValues { (packageName, rawUsageMs) ->
                 (rawUsageMs - (baselines[packageName] ?: 0L)).coerceAtLeast(0L)
             }
+            .filterValues { it > 0L }
     }
 
     private fun resetDailyStateIfNeeded() {

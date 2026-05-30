@@ -17,6 +17,7 @@ import android.provider.Settings
 import android.util.Base64
 import com.avoidsocialmedia.analytics.DailyAnalyticsStore
 import com.avoidsocialmedia.services.WatchdogService
+import com.avoidsocialmedia.usage.UsageEventsCalculator
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -26,7 +27,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -228,29 +228,23 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
       val usageStatsManager =
         reactContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
       val endTime = System.currentTimeMillis()
-      val startTime = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-      }.timeInMillis
-
-      val stats = usageStatsManager.queryUsageStats(
-        UsageStatsManager.INTERVAL_DAILY,
+      val startTime = UsageEventsCalculator.localStartOfDayMs()
+      val usageByPackage = UsageEventsCalculator.calculateUsageByEvents(
+        usageStatsManager,
+        null,
         startTime,
         endTime,
       )
 
       val packageManager = reactContext.packageManager
-      val mergedStats = stats
-        .filter { it.totalTimeInForeground > 0 }
-        .groupBy { it.packageName }
-        .map { (packageName, packageStats) ->
+      val mergedStats = usageByPackage
+        .filterValues { it > 0L }
+        .map { (packageName, totalTimeMs) ->
           UsageSummary(
             packageName = packageName,
             appName = getAppName(packageManager, packageName),
-            totalTimeMs = packageStats.sumOf { it.totalTimeInForeground },
-            lastTimeUsedMs = packageStats.maxOf { it.lastTimeUsed },
+            totalTimeMs = totalTimeMs,
+            lastTimeUsedMs = endTime,
           )
         }
         .sortedByDescending { it.totalTimeMs }
@@ -333,26 +327,17 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
     val usageStatsManager =
       reactContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
     val endTime = System.currentTimeMillis()
-    val startTime = Calendar.getInstance().apply {
-      set(Calendar.HOUR_OF_DAY, 0)
-      set(Calendar.MINUTE, 0)
-      set(Calendar.SECOND, 0)
-      set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
+    val startTime = UsageEventsCalculator.localStartOfDayMs()
 
-    val stats = usageStatsManager.queryUsageStats(
-      UsageStatsManager.INTERVAL_DAILY,
+    return UsageEventsCalculator.calculateUsageByEvents(
+      usageStatsManager,
+      packageNames,
       startTime,
       endTime,
     )
-
-    return stats
-      .filter { it.totalTimeInForeground > 0 && packageNames.contains(it.packageName) }
-      .groupBy { it.packageName }
-      .mapValues { (_, packageStats) -> packageStats.sumOf { it.totalTimeInForeground } }
+      .filterValues { it > 0L }
   }
 
-  // NSR - For testing purposes only - Comment out before production build
   private fun todayKey(): String =
     SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
