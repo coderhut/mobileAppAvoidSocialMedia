@@ -45,6 +45,7 @@ class WatchdogService : Service() {
     private var currentEscalationLevel = 0 // 0 = none, 1 = gentle, 2 = firm, 3 = urgent
     private var hasHitDailyLimitInitially = false
     private var stateDateKey = todayKey()
+    private var watchdogUsageResetVersion = 0
 
     companion object {
         const val CHANNEL_ID = "WatchdogServiceChannel"
@@ -112,6 +113,8 @@ class WatchdogService : Service() {
         resetDailyStateIfNeeded()
 
         val prefs = getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+        handleUsageResetIfNeeded(prefs.getInt("watchdogUsageResetVersion", 0))
+
         val selectedPackageJson = prefs.getString("selectedPackageNames", "[]") ?: "[]"
         val savedGlobalLimitMinutes = prefs.getInt("globalDailyLimit", 30) // Default 30 — JS state defaults to 30 but may not persist to SharedPreferences until user interacts
         val globalLimitMinutes = savedGlobalLimitMinutes.coerceAtLeast(minimumDailyLimitMinutes)
@@ -146,7 +149,12 @@ class WatchdogService : Service() {
             voiceNotePlayer.stop()
             interventionOverlay.hide()
             debugOverlay?.hide()
+            if (currentEscalationLevel > 0 && !hasHitDailyLimitInitially) {
+                hasHitDailyLimitInitially = true
+            }
+            currentEscalationLevel = 0
             sessionStartTimeMs = 0
+            persistEscalationState()
             Log.d("Watchdog", "Monitored session ended")
         }
 
@@ -205,11 +213,10 @@ class WatchdogService : Service() {
         }
 
         if (targetLevel > currentEscalationLevel && isUserInMonitoredApp) {
-            currentEscalationLevel = targetLevel
-            if (!hasHitDailyLimitInitially) {
-                hasHitDailyLimitInitially = true
+            if (!hasHitDailyLimitInitially && currentEscalationLevel == 0) {
                 DailyAnalyticsStore.recordLimitHit(this, currentForegroundPackage)
             }
+            currentEscalationLevel = targetLevel
             persistEscalationState()
             if (triggerVoiceNote(targetLevel, voiceNotesJson)) {
                 lastInterventionTimeMs = currentTime
@@ -293,10 +300,15 @@ class WatchdogService : Service() {
             endTime
         )
 
+        val baselines = readUsageResetBaselines()
+
         return stats
             .filter { it.totalTimeInForeground > 0 && packageNames.contains(it.packageName) }
             .groupBy { it.packageName }
-            .mapValues { (_, packageStats) -> packageStats.sumOf { it.totalTimeInForeground } }
+            .mapValues { (packageName, packageStats) ->
+                val rawUsageMs = packageStats.sumOf { it.totalTimeInForeground }
+                (rawUsageMs - (baselines[packageName] ?: 0L)).coerceAtLeast(0L)
+            }
     }
 
     private fun resetDailyStateIfNeeded() {
@@ -308,8 +320,27 @@ class WatchdogService : Service() {
         currentEscalationLevel = 0
         sessionStartTimeMs = if (isUserInMonitoredApp) System.currentTimeMillis() else 0
         lastInterventionTimeMs = 0
+        getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+            .edit()
+            .remove("watchdogUsageResetBaselines")
+            .apply()
         persistEscalationState()
         Log.d("Watchdog", "Daily watchdog state reset for $stateDateKey")
+    }
+
+    // NSR - For testing purposes only - Comment out before production build
+    private fun handleUsageResetIfNeeded(nextResetVersion: Int) {
+        if (nextResetVersion == watchdogUsageResetVersion) return
+
+        watchdogUsageResetVersion = nextResetVersion
+        hasHitDailyLimitInitially = false
+        currentEscalationLevel = 0
+        lastInterventionTimeMs = 0
+        sessionStartTimeMs = if (isUserInMonitoredApp) System.currentTimeMillis() else 0
+        voiceNotePlayer.stop()
+        interventionOverlay.hide()
+        persistEscalationState()
+        Log.d("Watchdog", "Compound usage reset applied: version=$watchdogUsageResetVersion")
     }
 
     private fun todayKey(): String =
@@ -333,6 +364,7 @@ class WatchdogService : Service() {
         if (savedDate == todayKey()) {
             hasHitDailyLimitInitially = prefs.getBoolean("watchdogHasHitLimit", false)
             currentEscalationLevel = prefs.getInt("watchdogEscalationLevel", 0)
+            watchdogUsageResetVersion = prefs.getInt("watchdogUsageResetVersion", 0)
             Log.d("Watchdog", "Restored: hasHitLimit=$hasHitDailyLimitInitially level=$currentEscalationLevel")
         } else {
             Log.d("Watchdog", "No persisted state for today — starting fresh")
@@ -349,6 +381,25 @@ class WatchdogService : Service() {
     }
 
     // ── Voice note player (separated from overlay so missing recordings never block alerts) ────
+
+    // NSR - For testing purposes only - Comment out before production build
+    private fun readUsageResetBaselines(): Map<String, Long> {
+        val value = getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+            .getString("watchdogUsageResetBaselines", "{}") ?: "{}"
+
+        return try {
+            val json = JSONObject(value)
+            val baselines = mutableMapOf<String, Long>()
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val packageName = keys.next()
+                baselines[packageName] = json.optLong(packageName, 0L)
+            }
+            baselines
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
 
     private fun tryPlayVoiceNote(level: Int, voiceNotesJson: String) {
         try {

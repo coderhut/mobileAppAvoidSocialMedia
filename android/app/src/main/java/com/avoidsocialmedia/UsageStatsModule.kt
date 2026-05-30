@@ -23,8 +23,12 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class UsageStatsModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -168,6 +172,52 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
+  fun getWatchdogDebugInfo(promise: Promise) {
+    try {
+      val preferences =
+        reactContext.getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+      promise.resolve(preferences.getString("watchdogDebugInfo", null))
+    } catch (error: Exception) {
+      promise.reject("WATCHDOG_DEBUG_READ_FAILED", error)
+    }
+  }
+
+  // NSR - For testing purposes only - Comment out before production build
+  @ReactMethod
+  fun resetWatchdogCompoundTime(promise: Promise) {
+    if (!hasUsageStatsPermission()) {
+      promise.reject("USAGE_ACCESS_NOT_GRANTED", "Usage access permission is not granted.")
+      return
+    }
+
+    try {
+      val preferences =
+        reactContext.getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
+      val selectedPackages = packageNamesToSet(preferences.getString("selectedPackageNames", "[]"))
+      val usageByPackage = calculateUsageByPackage(selectedPackages)
+      val baselineJson = JSONObject()
+      usageByPackage.forEach { (packageName, usageMs) ->
+        baselineJson.put(packageName, usageMs)
+      }
+
+      val nextResetVersion = preferences.getInt("watchdogUsageResetVersion", 0) + 1
+      preferences.edit()
+        .putString("watchdogUsageResetBaselines", baselineJson.toString())
+        .putInt("watchdogUsageResetVersion", nextResetVersion)
+        .putString("watchdogStateDate", todayKey())
+        .putBoolean("watchdogHasHitLimit", false)
+        .putInt("watchdogEscalationLevel", 0)
+        .remove("watchdogDebugInfo")
+        .apply()
+
+      WatchdogService.start(reactContext)
+      promise.resolve(null)
+    } catch (error: Exception) {
+      promise.reject("WATCHDOG_COMPOUND_RESET_FAILED", error)
+    }
+  }
+
+  @ReactMethod
   fun getTodayUsageStats(promise: Promise) {
     if (!hasUsageStatsPermission()) {
       promise.reject("USAGE_ACCESS_NOT_GRANTED", "Usage access permission is not granted.")
@@ -208,7 +258,7 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
       val preferences =
         reactContext.getSharedPreferences("avoid_social_media_preferences", Context.MODE_PRIVATE)
       val selectedPackages = packageNamesToSet(preferences.getString("selectedPackageNames", "[]"))
-      val globalLimitMinutes = preferences.getInt("globalDailyLimit", 0)
+      val globalLimitMinutes = preferences.getInt("globalDailyLimit", 30).coerceAtLeast(15)
       val selectedUsageByPackage = mergedStats
         .filter { selectedPackages.contains(it.packageName) }
         .associate { it.packageName to it.totalTimeMs }
@@ -275,6 +325,36 @@ class UsageStatsModule(private val reactContext: ReactApplicationContext) :
       add(jsonArray.getString(index))
     }
   }
+
+  // NSR - For testing purposes only - Comment out before production build
+  private fun calculateUsageByPackage(packageNames: Set<String>): Map<String, Long> {
+    if (packageNames.isEmpty()) return emptyMap()
+
+    val usageStatsManager =
+      reactContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+    val endTime = System.currentTimeMillis()
+    val startTime = Calendar.getInstance().apply {
+      set(Calendar.HOUR_OF_DAY, 0)
+      set(Calendar.MINUTE, 0)
+      set(Calendar.SECOND, 0)
+      set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    val stats = usageStatsManager.queryUsageStats(
+      UsageStatsManager.INTERVAL_DAILY,
+      startTime,
+      endTime,
+    )
+
+    return stats
+      .filter { it.totalTimeInForeground > 0 && packageNames.contains(it.packageName) }
+      .groupBy { it.packageName }
+      .mapValues { (_, packageStats) -> packageStats.sumOf { it.totalTimeInForeground } }
+  }
+
+  // NSR - For testing purposes only - Comment out before production build
+  private fun todayKey(): String =
+    SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
   private fun getAppIconBase64(packageManager: PackageManager, appInfo: ApplicationInfo): String? {
     return try {

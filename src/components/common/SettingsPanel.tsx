@@ -16,11 +16,15 @@ export function SettingsPanel({
   onClose,
   onEditRecordings,
   onManagePermissions,
+  onOpenWatchdogDebug,
+  onResetWatchdogTime,
 }: {
   isVisible: boolean;
   onClose: () => void;
   onEditRecordings?: () => void;
   onManagePermissions?: () => void;
+  onOpenWatchdogDebug?: () => void;
+  onResetWatchdogTime?: () => void;
 }) {
   const [isThemeSheetOpen, setIsThemeSheetOpen] = useState(false);
   const [isLanguageSheetOpen, setIsLanguageSheetOpen] = useState(false);
@@ -141,6 +145,32 @@ export function SettingsPanel({
                 <Text style={styles.optionLabel}>
                   {t('managePermissionsLabel')}
                 </Text>
+              </Pressable>
+            )}
+
+            {onOpenWatchdogDebug && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  handleClose();
+                  onOpenWatchdogDebug();
+                }}
+                style={styles.optionRow}
+              >
+                <Text style={styles.optionLabel}>Debug WatchDog</Text>
+              </Pressable>
+            )}
+
+            {onResetWatchdogTime && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  handleClose();
+                  onResetWatchdogTime();
+                }}
+                style={styles.optionRow}
+              >
+                <Text style={styles.optionLabel}>Reset Compound Time</Text>
               </Pressable>
             )}
           </View>

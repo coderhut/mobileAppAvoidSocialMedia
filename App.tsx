@@ -18,6 +18,7 @@ import { IntroScreen } from './src/components/screens/IntroScreen';
 import { LanguageSelectionScreen } from './src/components/screens/LanguageSelectionScreen';
 import { SetupPermissionsScreen } from './src/components/screens/SetupPermissionsScreen';
 import { VoiceRecordingScreen } from './src/components/screens/VoiceRecordingScreen';
+import { WatchdogDebugScreen } from './src/components/screens/WatchdogDebugScreen';
 import { TRANSLATIONS } from './src/locales';
 import { UsageStatsModule } from './src/native/modules';
 import { AppThemeContext, useAppTheme } from './src/theme/ThemeContext';
@@ -272,6 +273,26 @@ function AppContent() {
     }
   }, []);
 
+  // NSR - For testing purposes only - Comment out before production build
+  const resetWatchdogCompoundTime = React.useCallback(async () => {
+    if (Platform.OS !== 'android' || !UsageStatsModule) {
+      return;
+    }
+
+    try {
+      await UsageStatsModule.resetWatchdogCompoundTime();
+      Alert.alert(
+        'Debug WatchDog',
+        'Compound tracked time has been reset for watchdog testing.',
+      );
+    } catch {
+      Alert.alert(
+        'Debug WatchDog',
+        'Unable to reset compound tracked time. Make sure Usage Access is enabled.',
+      );
+    }
+  }, []);
+
   React.useEffect(() => {
     if (hasUsageAccess && hasOverlayAccess && step === 'dashboard') {
       UsageStatsModule?.startWatchdogService().catch(() => undefined);
@@ -306,6 +327,8 @@ function AppContent() {
     refreshOverlayAccess,
     refreshNotificationAccess,
     refreshMicrophoneAccess,
+    hasUsageAccess,
+    hasOverlayAccess,
   ]);
 
   React.useEffect(() => {
@@ -402,6 +425,15 @@ function AppContent() {
       );
     }
 
+    if (visibleStep === 'debug_watchdog') {
+      return (
+        <WatchdogDebugScreen
+          onBack={() => setStep('dashboard')}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+        />
+      );
+    }
+
     return (
       <DashboardScreen
         availableApps={availableApps}
@@ -445,6 +477,8 @@ function AppContent() {
         onClose={() => setIsSettingsOpen(false)}
         onEditRecordings={() => setStep('recordings')}
         onManagePermissions={() => setStep('setup_permissions')}
+        onOpenWatchdogDebug={() => setStep('debug_watchdog')}
+        onResetWatchdogTime={resetWatchdogCompoundTime}
       />
     </View>
   );

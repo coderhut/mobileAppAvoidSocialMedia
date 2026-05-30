@@ -4,6 +4,7 @@ export type Step =
   | 'recordings'
   | 'apps'
   | 'setup_permissions'
+  | 'debug_watchdog'
   | 'dashboard';
 export type ThemeMode = 'light' | 'dark';
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -145,6 +146,24 @@ export type UsageStat = {
   lastTimeUsedMs: number;
 };
 
+export type WatchdogDebugRow = {
+  level: string;
+  firesAt: string;
+  timeRemaining: string;
+  status: string;
+};
+
+export type WatchdogDebugInfo = {
+  scenario: string;
+  isInMonitoredApp: boolean;
+  activePackage: string | null;
+  totalUsageMs: number;
+  sessionElapsedMs: number;
+  currentEscalationLevel: number;
+  rows: WatchdogDebugRow[];
+  updatedAt: number;
+};
+
 export type DailyLimitSetting = {
   mode: LimitMode;
   limitMinutes: number;
@@ -169,6 +188,8 @@ export type UsageStatsBridge = {
   requestOverlayPermission: () => Promise<void>;
   startWatchdogService: () => Promise<void>;
   stopWatchdogService: () => Promise<void>;
+  getWatchdogDebugInfo: () => Promise<string | null>;
+  resetWatchdogCompoundTime: () => Promise<void>;
 };
 
 export type AppPreferences = {

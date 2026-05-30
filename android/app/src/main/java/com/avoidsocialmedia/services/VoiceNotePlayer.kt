@@ -28,9 +28,10 @@ class VoiceNotePlayer(private val context: Context) {
     fun play(filePath: String, onComplete: () -> Unit) {
         stop()
 
-        val file = File(filePath)
+        val normalizedPath = normalizeFilePath(filePath)
+        val file = File(normalizedPath)
         if (!file.exists()) {
-            Log.e("VoiceNotePlayer", "File does not exist: $filePath")
+            Log.e("VoiceNotePlayer", "File does not exist: raw=$filePath normalized=$normalizedPath")
             return
         }
 
@@ -42,13 +43,13 @@ class VoiceNotePlayer(private val context: Context) {
 
         try {
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(context, Uri.fromFile(file))
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build()
                 )
+                setDataSource(context, Uri.fromFile(file))
                 setOnCompletionListener {
                     stop()
                     onComplete()
@@ -87,7 +88,8 @@ class VoiceNotePlayer(private val context: Context) {
 
             focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(playbackAttributes)
-                .setAcceptsDelayedFocusGain(true)
+                .setAcceptsDelayedFocusGain(false)
+                .setWillPauseWhenDucked(false)
                 .setOnAudioFocusChangeListener(audioFocusChangeListener)
                 .build()
 
@@ -110,4 +112,11 @@ class VoiceNotePlayer(private val context: Context) {
             audioManager.abandonAudioFocus(audioFocusChangeListener)
         }
     }
+
+    private fun normalizeFilePath(filePath: String): String =
+        if (filePath.startsWith("file://")) {
+            Uri.parse(filePath).path ?: filePath.removePrefix("file://")
+        } else {
+            filePath
+        }
 }
